@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "171720765352",
+    "project_id": "skiplaain",
+    "storage_bucket": "skiplaain.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:171720765352:android:cf99ba108c6b7b2ef1379d",
+        "android_client_info": {
+          "package_name": "com.example.skiplaain_partner_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApnbBwq8iX_yujKPpkCF8nQ9KBSOIhGa0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

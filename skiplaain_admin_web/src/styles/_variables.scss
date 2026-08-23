@@ -1,0 +1,34 @@
+// Typography
+$font-main: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+// Skiplaain Theme Colors
+$bg-primary: #000000;
+$bg-secondary: #0a0a0a;
+$bg-card: #111111;
+$bg-card-hover: #181818;
+$bg-sidebar: #080808;
+
+$border-color: #1e1e1e;
+$border-active: #00ff00;
+
+$accent: #00ff00;
+$accent-dim: #00cc00;
+$accent-bg: rgba(0, 255, 0, 0.08);
+$accent-bg-hover: rgba(0, 255, 0, 0.15);
+
+$text-primary: #ffffff;
+$text-secondary: #a0a0a0;
+$text-muted: #5a5a5a;
+
+$danger: #ff4444;
+$warning: #ff9900;
+$info: #3399ff;
+$success: #00ff00;
+
+$radius-sm: 6px;
+$radius-md: 10px;
+$radius-lg: 14px;
+
+// Breakpoints
+$breakpoint-mobile: 768px;
+$breakpoint-tablet: 1100px;

@@ -1,0 +1,15 @@
+@use '../../styles/variables' as *;
+
+.partner-detail-card {
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  padding: 22px;
+  margin-bottom: 18px;
+}
+
+.detail-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}

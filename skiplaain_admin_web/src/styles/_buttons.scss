@@ -1,0 +1,49 @@
+@use './variables' as *;
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: $radius-sm;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &-primary {
+    background: $accent;
+    color: #000000;
+
+    &:hover {
+      background: $accent-dim;
+    }
+  }
+
+  &-ghost {
+    background: transparent;
+    color: $text-secondary;
+    border: 1px solid $border-color;
+
+    &:hover {
+      background: $bg-card;
+      color: $text-primary;
+    }
+  }
+
+  &-danger {
+    background: rgba(255, 68, 68, 0.1);
+    color: $danger;
+    border: 1px solid rgba(255, 68, 68, 0.2);
+
+    &:hover {
+      background: rgba(255, 68, 68, 0.2);
+    }
+  }
+
+  &-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+}

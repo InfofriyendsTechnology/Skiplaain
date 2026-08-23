@@ -1,0 +1,45 @@
+# Root Git Ignore for Skiplaain
+
+# Dependencies
+node_modules/
+.npm/
+
+# Large Archives
+*.zip
+*.tar.gz
+*.rar
+**/*.zip
+
+# Flutter & Dart
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+
+# JDK / Java
+**/jdk17/
+**/jdk/
+**/*.jar
+**/*.class
+
+# Android & iOS
+**/.gradle/
+**/local.properties
+**/GeneratedPluginRegistrant.java
+**/*.apk
+**/*.aab
+
+# Editor & System
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Environment
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
