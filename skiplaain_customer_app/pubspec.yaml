@@ -1,0 +1,39 @@
+name: skiplaain_customer_app
+description: "Skiplaain Customer Booking App - Discover salons, select services, and book instant appointments."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  firebase_core: ^4.7.0
+  firebase_auth: ^6.4.0
+  cloud_firestore: ^6.3.0
+  google_fonts: ^6.3.0
+  intl: ^0.19.0
+  uuid: ^4.5.1
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.5.3
+  intl_phone_field: ^3.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/images/logo.png
+    - assets/images/full_logo.png
+    - assets/images/skiplaain_full.png
+    - assets/images/bird_icon.png
+    - assets/images/bird_transparent.png

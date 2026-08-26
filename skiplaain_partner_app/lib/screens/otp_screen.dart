@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
+import '../services/partner_service.dart';
 import '../utils/transitions.dart';
 import 'onboarding/welcome_partner_screen.dart';
+import 'dashboard/main_dashboard_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
@@ -25,6 +29,7 @@ class _OtpScreenState extends State<OtpScreen> {
   // Timer State
   int _resendTimeout = 30;
   Timer? _timer;
+  bool _canResend = false;
 
   @override
   void initState() {
@@ -35,27 +40,31 @@ class _OtpScreenState extends State<OtpScreen> {
   void _startResendTimer() {
     setState(() {
       _resendTimeout = 30;
+      _canResend = false;
     });
+
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendTimeout > 0) {
+      if (_resendTimeout == 0) {
+        setState(() {
+          _canResend = true;
+        });
+        timer.cancel();
+      } else {
         setState(() {
           _resendTimeout--;
         });
-      } else {
-        _timer?.cancel();
       }
     });
   }
 
   void _resendOTP() {
-    if (_resendTimeout > 0) return;
+    if (!_canResend) return;
 
-    _startResendTimer();
-    
     widget.authService.sendOTP(
       phoneNumber: widget.phoneNumber,
       onSuccess: () {
+        _startResendTimer();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('OTP sent again successfully!'),
@@ -82,25 +91,65 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   void _verifyOTP() {
-    if (_otpController.text.length != 6) return;
+    final cleanOtp = _otpController.text.trim();
+    if (cleanOtp.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter the complete 6-digit OTP'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
     });
 
     widget.authService.verifyOTP(
-      otp: _otpController.text,
-      onSuccess: () {
-        setState(() {
-          _isLoading = false;
-        });
-        
-        // Navigate to Onboarding Welcome Screen
-        Navigator.pushAndRemoveUntil(
-          context,
-          PremiumTransition(page: WelcomePartnerScreen(phoneNumber: widget.phoneNumber)),
-          (route) => false,
-        );
+      otp: cleanOtp,
+      onSuccess: () async {
+        final cleanPhone = widget.phoneNumber.replaceAll(RegExp(r'\D'), '');
+        final targetId = 'partner_$cleanPhone';
+
+        // 1. Save session to SharedPreferences immediately
+        await PartnerService().savePartnerSession(phoneNumber: widget.phoneNumber, partnerId: targetId);
+
+        // 2. Create / merge partner entry in Firestore
+        try {
+          await FirebaseFirestore.instance.collection('partners').doc(targetId).set({
+            'id': targetId,
+            'phone': widget.phoneNumber,
+            'status': 'active',
+            'lastActive': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } catch (_) {}
+
+        // 3. Check if partner already completed onboarding
+        bool isOnboarded = false;
+        try {
+          final partnerDoc = await FirebaseFirestore.instance.collection('partners').doc(targetId).get();
+          if (partnerDoc.exists && (partnerDoc.data()?['isOnboarded'] == true || partnerDoc.data()?['salonName'] != null)) {
+            isOnboarded = true;
+          }
+        } catch (_) {}
+
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+
+        if (isOnboarded) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            PremiumTransition(page: const MainDashboardScreen()),
+            (route) => false,
+          );
+        } else {
+          Navigator.pushAndRemoveUntil(
+            context,
+            PremiumTransition(page: WelcomePartnerScreen(phoneNumber: widget.phoneNumber)),
+            (route) => false,
+          );
+        }
       },
       onError: (error) {
         setState(() {
@@ -119,6 +168,7 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -150,6 +200,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -168,29 +219,14 @@ class _OtpScreenState extends State<OtpScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF2A2A2A)),
-                    ),
-                    child: const Text(
-                      'Testing OTP: 111111',
-                      style: TextStyle(
-                        color: Color(0xFF00FF00),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 36),
+                  
+                  // ORIGINAL 6-BOX PREMIUM OTP UI
                   Center(
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // The visual boxes
+                        // 6 Individual Square Boxes
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(6, (index) {
@@ -198,27 +234,40 @@ class _OtpScreenState extends State<OtpScreen> {
                             if (_otpController.text.length > index) {
                               char = _otpController.text[index];
                             }
-                            
+
                             bool isFocused = _otpController.text.length == index;
+                            bool isFilled = char.isNotEmpty;
 
                             return Expanded(
                               child: Container(
-                                height: 60,
+                                height: 56,
                                 margin: const EdgeInsets.symmetric(horizontal: 4),
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF1A1A1A),
+                                  color: const Color(0xFF141414),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isFocused ? const Color(0xFF00FF00) : Colors.transparent,
-                                    width: 2,
+                                    color: isFocused
+                                        ? const Color(0xFF00FF00)
+                                        : (isFilled
+                                            ? const Color(0xFF00FF00).withOpacity(0.6)
+                                            : const Color(0xFF262626)),
+                                    width: isFocused ? 2 : 1.2,
                                   ),
+                                  boxShadow: isFocused
+                                      ? [
+                                          BoxShadow(
+                                            color: const Color(0xFF00FF00).withOpacity(0.25),
+                                            blurRadius: 10,
+                                          ),
+                                        ]
+                                      : [],
                                 ),
                                 child: Text(
                                   char,
                                   style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
                                     color: Colors.white,
                                   ),
                                 ),
@@ -226,21 +275,23 @@ class _OtpScreenState extends State<OtpScreen> {
                             );
                           }),
                         ),
-                        // The actual invisible TextField that captures input
+
+                        // Invisible Input Handler
                         Positioned.fill(
                           child: Opacity(
-                            opacity: 0, // Make it completely invisible
+                            opacity: 0,
                             child: TextField(
                               controller: _otpController,
                               maxLength: 6,
                               keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                               autofocus: true,
                               decoration: const InputDecoration(
                                 counterText: "",
                                 border: InputBorder.none,
                               ),
                               onChanged: (val) {
-                                setState(() {}); // Trigger rebuild to update visual boxes
+                                setState(() {});
                                 if (val.length == 6) {
                                   _verifyOTP();
                                 }
@@ -251,7 +302,33 @@ class _OtpScreenState extends State<OtpScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  
+                  const SizedBox(height: 24),
+                  
+                  Center(
+                    child: _canResend
+                        ? TextButton(
+                            onPressed: _resendOTP,
+                            child: const Text(
+                              'Resend Code',
+                              style: TextStyle(
+                                color: Color(0xFF00FF00),
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            'Resend code in 00:${_resendTimeout.toString().padLeft(2, '0')}',
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 14,
+                            ),
+                          ),
+                  ),
+                  
+                  const Spacer(),
+                  
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -266,34 +343,25 @@ class _OtpScreenState extends State<OtpScreen> {
                         elevation: 0,
                       ),
                       child: _isLoading
-                          ? const CircularProgressIndicator(color: Colors.black)
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.black,
+                                strokeWidth: 2,
+                              ),
+                            )
                           : const Text(
-                              'Verify',
+                              'Verify & Proceed',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
                               ),
                             ),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Center(
-                    child: TextButton(
-                      onPressed: _resendTimeout > 0 ? null : _resendOTP,
-                      style: TextButton.styleFrom(
-                        foregroundColor: _resendTimeout > 0 ? Colors.white38 : const Color(0xFF00FF00),
-                      ),
-                      child: Text(
-                        _resendTimeout > 0
-                            ? "Resend Code in 00:${_resendTimeout.toString().padLeft(2, '0')}"
-                            : "Didn't receive the code? Resend",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: _resendTimeout > 0 ? FontWeight.normal : FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),

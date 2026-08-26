@@ -3,3 +3,15 @@
 .bookings-page {
   // Page specific styles
 }
+
+.barber-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: rgba(0, 255, 0, 0.08);
+  border: 1px solid rgba(0, 255, 0, 0.2);
+  border-radius: 8px;
+  color: #00FF00;
+  font-size: 0.8rem;
+  font-weight: 600;
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/bookings_tab.dart';
+import 'tabs/customers_tab.dart';
 import 'tabs/profile_tab.dart';
 
 class MainDashboardScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   final List<Widget> _tabs = [
     const HomeTab(),
     const BookingsTab(),
+    const CustomersTab(),
     const ProfileTab(),
   ];
 
@@ -72,6 +74,17 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                   child: Icon(Icons.calendar_month),
                 ),
                 label: 'Bookings',
+              ),
+              BottomNavigationBarItem(
+                icon: Padding(
+                  padding: EdgeInsets.only(bottom: 4.0),
+                  child: Icon(Icons.people_outline),
+                ),
+                activeIcon: Padding(
+                  padding: EdgeInsets.only(bottom: 4.0),
+                  child: Icon(Icons.people),
+                ),
+                label: 'Customers',
               ),
               BottomNavigationBarItem(
                 icon: Padding(

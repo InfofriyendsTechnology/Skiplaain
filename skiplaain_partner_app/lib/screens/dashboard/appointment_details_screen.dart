@@ -120,12 +120,12 @@ class AppointmentDetailsScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _buildDetailRow(Icons.calendar_today, 'Date', 'Today'),
+                    _buildDetailRow(Icons.calendar_today, 'Date & Time', time),
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Divider(color: Color(0xFF2A2A2A)),
                     ),
-                    _buildDetailRow(Icons.access_time, 'Time', time),
+                    _buildDetailRow(Icons.person_pin_circle, 'Assigned Barber', appointmentData['barberName'] ?? 'Any Available Barber'),
                   ],
                 ),
               ),

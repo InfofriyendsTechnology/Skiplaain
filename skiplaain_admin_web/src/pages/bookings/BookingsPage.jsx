@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiCalendar } from 'react-icons/fi';
+import { FiCalendar, FiUserCheck } from 'react-icons/fi';
 import Navbar from '../../components/layout/Navbar';
 import { onBookingsSnapshot } from '../../services/firebaseService';
 import './BookingsPage.scss';
@@ -52,9 +52,10 @@ const BookingsPage = () => {
                   <tr>
                     <th>Customer</th>
                     <th>Salon</th>
+                    <th>Barber / Specialist</th>
                     <th>Service</th>
                     <th>Amount</th>
-                    <th>Time</th>
+                    <th>Date & Time</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -63,10 +64,20 @@ const BookingsPage = () => {
                     <tr key={booking.id}>
                       <td className="td-primary">{booking.customerName || '—'}</td>
                       <td>{booking.salonName || '—'}</td>
+                      <td>
+                        <span className="barber-badge">
+                          <FiUserCheck style={{ marginRight: 4 }} />
+                          {booking.barberName || 'Any Available'}
+                        </span>
+                      </td>
                       <td>{booking.service || '—'}</td>
-                      <td className="td-accent">₹{booking.price || '0'}</td>
-                      <td>{booking.time || '—'}</td>
-                      <td><span className={`badge ${(booking.status || 'pending').toLowerCase()}`}>{booking.status || 'Pending'}</span></td>
+                      <td className="td-accent">₹{booking.totalAmount || booking.price || '0'}</td>
+                      <td>{booking.bookingDate ? `${booking.bookingDate}, ` : ''}{booking.timeSlot || booking.time || '—'}</td>
+                      <td>
+                        <span className={`badge ${(booking.status || 'pending').toLowerCase()}`}>
+                          {booking.status || 'Pending'}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

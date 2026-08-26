@@ -1,31 +1,44 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
-import { FiUsers, FiCalendar, FiDollarSign, FiTrendingUp, FiInbox } from 'react-icons/fi';
+import { useOutletContext, useNavigate } from 'react-router-dom';
+import { FiUsers, FiCalendar, FiTrendingUp, FiAward, FiInbox, FiUserCheck } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import Navbar from '../../components/layout/Navbar';
 import StatCard from '../../components/common/StatCard';
-import { onPartnersSnapshot } from '../../services/firebaseService';
+import { onPartnersSnapshot, onCustomersSnapshot, onBookingsSnapshot, onMembershipsSnapshot } from '../../services/firebaseService';
 import './DashboardOverview.scss';
 
 const DashboardOverview = () => {
   const [partners, setPartners] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [memberships, setMemberships] = useState([]);
   const { onMenuClick } = useOutletContext() || {};
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onPartnersSnapshot((data) => {
-      setPartners(data);
-    });
-    return () => unsubscribe && unsubscribe();
+    const unsubPartners = onPartnersSnapshot(setPartners);
+    const unsubCust = onCustomersSnapshot(setCustomers);
+    const unsubBookings = onBookingsSnapshot(setBookings);
+    const unsubMemberships = onMembershipsSnapshot(setMemberships);
+
+    return () => {
+      unsubPartners && unsubPartners();
+      unsubCust && unsubCust();
+      unsubBookings && unsubBookings();
+      unsubMemberships && unsubMemberships();
+    };
   }, []);
 
   const totalPartners = partners.length;
   const verifiedPartners = partners.filter(p => p.status === 'verified').length;
-  const pendingPartners = partners.filter(p => !p.status || p.status === 'pending').length;
+  const totalCustomers = customers.length;
+  const totalBookings = bookings.length;
+  const activeVipPasses = memberships.filter(m => m.status === 'active' || !m.status).length;
 
   return (
     <>
       <Navbar
-        title="Dashboard"
+        title="Super Admin Dashboard"
         subtitle={`${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}`}
         onMenuClick={onMenuClick}
       />
@@ -37,19 +50,19 @@ const DashboardOverview = () => {
             value={totalPartners}
           />
           <StatCard
-            icon={<FiTrendingUp />}
-            label="Verified Partners"
-            value={verifiedPartners}
+            icon={<FiUserCheck />}
+            label="Registered Customers"
+            value={totalCustomers}
           />
           <StatCard
             icon={<FiCalendar />}
-            label="Pending Approval"
-            value={pendingPartners}
+            label="Total Appointments"
+            value={totalBookings}
           />
           <StatCard
-            icon={<FiDollarSign />}
-            label="Total Revenue"
-            value="₹0"
+            icon={<FiAward />}
+            label="Active VIP Passes"
+            value={activeVipPasses}
           />
         </div>
 
@@ -61,7 +74,7 @@ const DashboardOverview = () => {
           transition={{ duration: 0.5, delay: 0.2 }}
         >
           <div className="data-table-header">
-            <h3 className="data-table-title">Recent Partners</h3>
+            <h3 className="data-table-title">Partner Salons</h3>
             <span className="data-table-count">{totalPartners} total</span>
           </div>
           {partners.length > 0 ? (
@@ -76,7 +89,7 @@ const DashboardOverview = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {partners.slice(0, 8).map((partner) => (
+                  {partners.slice(0, 6).map((partner) => (
                     <tr key={partner.id}>
                       <td className="td-primary">{partner.salonName || partner.businessName || '—'}</td>
                       <td>{partner.phone || '—'}</td>
@@ -98,7 +111,7 @@ const DashboardOverview = () => {
               </div>
               <h4 className="empty-state-title">No Partners Yet</h4>
               <p className="empty-state-desc">
-                When salon owners register via the Partner App, they'll appear here in real-time.
+                Partner salons will appear here once they register on the Partner App.
               </p>
             </div>
           )}

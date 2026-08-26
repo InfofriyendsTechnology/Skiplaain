@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/partner_service.dart';
 import '../../utils/transitions.dart';
-import '../dashboard/main_dashboard_screen.dart';
+import 'add_barbers_screen.dart';
 
 class BusinessHoursScreen extends StatefulWidget {
   final String salonName;
@@ -65,55 +65,22 @@ class _BusinessHoursScreenState extends State<BusinessHoursScreen> {
     }
   }
 
-  Future<void> _onSaveAndContinue() async {
-    if (_isSaving) return;
-
-    setState(() {
-      _isSaving = true;
-    });
-
-    try {
-      final partnerService = PartnerService();
-      await partnerService.savePartnerProfile(
-        salonName: widget.salonName,
-        address: widget.address,
-        category: widget.category,
-        phoneNumber: widget.phoneNumber,
-        openingTime: _openingTime,
-        closingTime: _closingTime,
-        weeklyOff: _weeklyOff,
-        services: widget.services,
-        status: 'active',
-      );
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🎉 Registration Successful! Salon profile saved.'),
-          backgroundColor: Color(0xFF00FF00),
-          behavior: SnackBarBehavior.floating,
+  void _onSaveAndContinue() {
+    Navigator.push(
+      context,
+      PremiumTransition(
+        page: AddBarbersScreen(
+          phoneNumber: widget.phoneNumber,
+          salonName: widget.salonName,
+          address: widget.address,
+          category: widget.category,
+          openingTime: _openingTime,
+          closingTime: _closingTime,
+          weeklyOff: _weeklyOff,
+          services: widget.services,
         ),
-      );
-
-      Navigator.pushAndRemoveUntil(
-        context,
-        PremiumTransition(page: const MainDashboardScreen()),
-        (Route<dynamic> route) => false,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isSaving = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to save profile: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+      ),
+    );
   }
 
   Widget _buildTimeSelector({

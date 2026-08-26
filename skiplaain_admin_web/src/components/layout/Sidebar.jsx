@@ -1,11 +1,12 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { FiGrid, FiUsers, FiCalendar, FiSettings, FiLogOut } from 'react-icons/fi';
+import { FiGrid, FiUsers, FiUserCheck, FiCalendar, FiSettings, FiLogOut } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './Sidebar.scss';
 
 const navItems = [
   { path: '/', label: 'Overview', icon: <FiGrid /> },
   { path: '/partners', label: 'Partners', icon: <FiUsers /> },
+  { path: '/customers', label: 'Customers', icon: <FiUserCheck /> },
   { path: '/bookings', label: 'Bookings', icon: <FiCalendar /> },
   { path: '/settings', label: 'Settings', icon: <FiSettings /> },
 ];
