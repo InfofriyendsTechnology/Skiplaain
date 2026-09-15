@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiCalendar, FiUserCheck } from 'react-icons/fi';
+import { FiCalendar, FiUserCheck, FiTrash2 } from 'react-icons/fi';
 import Navbar from '../../components/layout/Navbar';
-import { onBookingsSnapshot } from '../../services/firebaseService';
+import { onBookingsSnapshot, clearAllBookings } from '../../services/firebaseService';
+import toast from 'react-hot-toast';
 import './BookingsPage.scss';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
   const [filter, setFilter] = useState('All');
+  const [isClearing, setIsClearing] = useState(false);
   const { onMenuClick } = useOutletContext() || {};
 
   useEffect(() => {
@@ -17,6 +19,24 @@ const BookingsPage = () => {
     });
     return () => unsubscribe && unsubscribe();
   }, []);
+
+  const handleClearHistory = async () => {
+    if (bookings.length === 0) {
+      toast.error('No bookings to clear.');
+      return;
+    }
+    if (!window.confirm(`⚠️ Are you sure you want to delete all ${bookings.length} booking(s)? This will permanently clear booking history.`)) return;
+
+    setIsClearing(true);
+    try {
+      const count = await clearAllBookings();
+      toast.success(`Cleared ${count} booking(s) successfully!`);
+    } catch (err) {
+      toast.error('Failed to clear bookings: ' + err.message);
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   const filters = ['All', 'Confirmed', 'Pending', 'Completed', 'Cancelled'];
 
@@ -28,7 +48,7 @@ const BookingsPage = () => {
     <>
       <Navbar
         title="Live Bookings"
-        subtitle="Real-time appointments across all partner salons"
+        subtitle={`${bookings.length} total platform bookings`}
         onMenuClick={onMenuClick}
       />
       <div className="page-container">
@@ -41,9 +61,21 @@ const BookingsPage = () => {
         </div>
 
         <motion.div className="data-table-wrapper" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <div className="data-table-header">
-            <h3 className="data-table-title">All Bookings</h3>
-            <span className="data-table-count">{filteredBookings.length} bookings</span>
+          <div className="data-table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 className="data-table-title">All Bookings</h3>
+              <span className="data-table-count">{filteredBookings.length} bookings</span>
+            </div>
+            {bookings.length > 0 && (
+              <button 
+                className="btn btn-danger btn-sm" 
+                onClick={handleClearHistory}
+                disabled={isClearing}
+                style={{ padding: '6px 12px', fontSize: 12 }}
+              >
+                <FiTrash2 /> Clear All History
+              </button>
+            )}
           </div>
           {filteredBookings.length > 0 ? (
             <div className="table-responsive">

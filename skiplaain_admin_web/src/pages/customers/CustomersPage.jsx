@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiUsers, FiSearch, FiRepeat, FiAward, FiDollarSign, FiClock, FiX } from 'react-icons/fi';
+import { FiUsers, FiSearch, FiRepeat, FiAward, FiDollarSign, FiClock, FiX, FiTrash2 } from 'react-icons/fi';
 import Navbar from '../../components/layout/Navbar';
 import StatCard from '../../components/common/StatCard';
-import { onCustomersSnapshot, onBookingsSnapshot, onMembershipsSnapshot } from '../../services/firebaseService';
+import { onCustomersSnapshot, onBookingsSnapshot, onMembershipsSnapshot, clearAllCustomers } from '../../services/firebaseService';
+import toast from 'react-hot-toast';
 import './CustomersPage.scss';
 
 const CustomersPage = () => {
@@ -197,6 +198,24 @@ const CustomersPage = () => {
               <FiRepeat style={{ marginRight: 6, verticalAlign: 'middle' }} /> Repeat Clients ({repeatClients})
             </button>
           </div>
+
+          {totalCustomers > 0 && (
+            <button 
+              className="btn btn-danger btn-sm" 
+              onClick={async () => {
+                if (!window.confirm(`⚠️ Delete all ${totalCustomers} customer account(s)? This cannot be undone.`)) return;
+                try {
+                  const count = await clearAllCustomers();
+                  toast.success(`Cleared ${count} customer record(s)!`);
+                } catch (e) {
+                  toast.error('Failed to clear customers: ' + e.message);
+                }
+              }}
+              style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12 }}
+            >
+              <FiTrash2 /> Clear All Customers
+            </button>
+          )}
         </div>
 
         {/* Customers Table */}

@@ -1,4 +1,15 @@
-import { collection, getDocs, doc, updateDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  updateDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  limit, 
+  writeBatch 
+} from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 // Get all partners
@@ -20,6 +31,32 @@ export const onPartnersSnapshot = (callback) => {
 export const updatePartnerStatus = async (partnerId, status) => {
   const ref = doc(db, 'partners', partnerId);
   await updateDoc(ref, { status });
+};
+
+// Delete a specific barber from a salon partner
+export const deletePartnerBarber = async (partnerId, barberId) => {
+  const partnerRef = doc(db, 'partners', partnerId);
+  const snapshot = await getDocs(collection(db, 'partners'));
+  const partnerDoc = snapshot.docs.find(d => d.id === partnerId);
+  
+  if (partnerDoc) {
+    const barbers = partnerDoc.data().barbers || [];
+    const updatedBarbers = barbers.filter(b => b.id !== barberId);
+    await updateDoc(partnerRef, { barbers: updatedBarbers });
+    return updatedBarbers;
+  }
+};
+
+// Clear all barbers from a salon partner
+export const clearSalonBarbers = async (partnerId) => {
+  const ref = doc(db, 'partners', partnerId);
+  await updateDoc(ref, { barbers: [] });
+};
+
+// Delete an entire salon partner
+export const deletePartner = async (partnerId) => {
+  const ref = doc(db, 'partners', partnerId);
+  await deleteDoc(ref);
 };
 
 // Get all bookings
@@ -53,4 +90,53 @@ export const onMembershipsSnapshot = (callback) => {
     const memberships = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     callback(memberships);
   });
+};
+
+// Helper to batch delete all documents in a collection
+export const clearCollection = async (collectionName) => {
+  const snapshot = await getDocs(collection(db, collectionName));
+  if (snapshot.empty) return 0;
+
+  const batch = writeBatch(db);
+  snapshot.docs.forEach((docItem) => {
+    batch.delete(docItem.ref);
+  });
+  await batch.commit();
+  return snapshot.size;
+};
+
+// Purge all bookings history
+export const clearAllBookings = async () => {
+  return await clearCollection('bookings');
+};
+
+// Purge all customers data
+export const clearAllCustomers = async () => {
+  return await clearCollection('customers');
+};
+
+// Purge all memberships data
+export const clearAllMemberships = async () => {
+  return await clearCollection('memberships');
+};
+
+// Purge full test database (bookings, customers, memberships, and clear barbers)
+export const purgeAllTestData = async () => {
+  const [bCount, cCount, mCount] = await Promise.all([
+    clearCollection('bookings'),
+    clearCollection('customers'),
+    clearCollection('memberships')
+  ]);
+
+  // Also clear barbers across all partners
+  const partnersSnapshot = await getDocs(collection(db, 'partners'));
+  if (!partnersSnapshot.empty) {
+    const batch = writeBatch(db);
+    partnersSnapshot.docs.forEach((pDoc) => {
+      batch.update(pDoc.ref, { barbers: [] });
+    });
+    await batch.commit();
+  }
+
+  return { bCount, cCount, mCount, partnersAffected: partnersSnapshot.size };
 };
