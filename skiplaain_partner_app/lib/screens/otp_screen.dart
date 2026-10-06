@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/partner_service.dart';
+import '../utils/popup_utils.dart';
 import '../utils/transitions.dart';
 import 'onboarding/welcome_partner_screen.dart';
 import 'dashboard/main_dashboard_screen.dart';
@@ -11,11 +12,13 @@ import 'dashboard/main_dashboard_screen.dart';
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
   final AuthService authService;
+  final bool isNewUser;
 
   const OtpScreen({
     super.key,
     required this.phoneNumber,
     required this.authService,
+    required this.isNewUser,
   });
 
   @override
@@ -65,20 +68,13 @@ class _OtpScreenState extends State<OtpScreen> {
       phoneNumber: widget.phoneNumber,
       onSuccess: () {
         _startResendTimer();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('OTP sent again successfully!'),
-            backgroundColor: Color(0xFF00FF00),
-          ),
+        PopupUtils.showSuccessNotification(
+          context,
+          'OTP sent again successfully!',
         );
       },
       onError: (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error),
-            backgroundColor: Colors.red,
-          ),
-        );
+        PopupUtils.showErrorNotification(context, error);
       },
     );
   }
@@ -93,11 +89,9 @@ class _OtpScreenState extends State<OtpScreen> {
   void _verifyOTP() {
     final cleanOtp = _otpController.text.trim();
     if (cleanOtp.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the complete 6-digit OTP'),
-          backgroundColor: Colors.red,
-        ),
+      PopupUtils.showErrorNotification(
+        context,
+        'Please enter the complete 6-digit OTP',
       );
       return;
     }
@@ -125,28 +119,33 @@ class _OtpScreenState extends State<OtpScreen> {
           }, SetOptions(merge: true));
         } catch (_) {}
 
-        // 3. Check if partner already completed onboarding
-        bool isOnboarded = false;
-        try {
-          final partnerDoc = await FirebaseFirestore.instance.collection('partners').doc(targetId).get();
-          if (partnerDoc.exists && (partnerDoc.data()?['isOnboarded'] == true || partnerDoc.data()?['salonName'] != null)) {
-            isOnboarded = true;
-          }
-        } catch (_) {}
-
         if (!mounted) return;
         setState(() => _isLoading = false);
 
-        if (isOnboarded) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            PremiumTransition(page: const MainDashboardScreen()),
-            (route) => false,
-          );
-        } else {
+        PopupUtils.showSuccessNotification(
+          context,
+          widget.isNewUser 
+              ? 'Phone verified! Let\'s set up your salon'
+              : 'Welcome back to Skiplaain!',
+        );
+
+        // Small delay for notification visibility before navigation
+        await Future.delayed(const Duration(milliseconds: 400));
+
+        if (!mounted) return;
+
+        if (widget.isNewUser) {
+          // New user - always go to onboarding
           Navigator.pushAndRemoveUntil(
             context,
             PremiumTransition(page: WelcomePartnerScreen(phoneNumber: widget.phoneNumber)),
+            (route) => false,
+          );
+        } else {
+          // Existing user - go to dashboard
+          Navigator.pushAndRemoveUntil(
+            context,
+            PremiumTransition(page: const MainDashboardScreen()),
             (route) => false,
           );
         }
@@ -155,12 +154,7 @@ class _OtpScreenState extends State<OtpScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error),
-            backgroundColor: Colors.red,
-          ),
-        );
+        PopupUtils.showErrorNotification(context, error);
       },
     );
   }
@@ -195,9 +189,9 @@ class _OtpScreenState extends State<OtpScreen> {
                     ),
                   ),
                   const SizedBox(height: 40),
-                  const Text(
-                    'Verify Phone',
-                    style: TextStyle(
+                  Text(
+                    widget.isNewUser ? 'Welcome to Skiplaain!' : 'Welcome Back!',
+                    style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -206,7 +200,9 @@ class _OtpScreenState extends State<OtpScreen> {
                   const SizedBox(height: 8),
                   RichText(
                     text: TextSpan(
-                      text: 'Enter the 6-digit code sent to ',
+                      text: widget.isNewUser 
+                          ? 'Enter code to set up your salon: '
+                          : 'Enter the 6-digit code sent to ',
                       style: const TextStyle(fontSize: 15, color: Colors.white70),
                       children: [
                         TextSpan(

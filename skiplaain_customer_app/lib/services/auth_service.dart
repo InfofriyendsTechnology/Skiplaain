@@ -140,6 +140,20 @@ class CustomerAuthService {
     }
   }
 
+  /// Check if phone number already exists in Firestore
+  Future<bool> isPhoneNumberRegistered(String phoneNumber) async {
+    try {
+      final cleanPhone = phoneNumber.trim().startsWith('+')
+          ? phoneNumber.trim()
+          : '+91${phoneNumber.trim().replaceAll(RegExp(r'\D'), '')}';
+      
+      final doc = await _firestore.collection('customers').doc(cleanPhone).get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Send OTP to customer mobile number
   Future<void> sendOTP({
     required String phoneNumber,
@@ -152,6 +166,15 @@ class CustomerAuthService {
         onError("Please enter a valid 10-digit mobile number.");
         return;
       }
+
+      // Check if phone number already registered
+      final fullPhone = '+91$cleanPhone';
+      final isRegistered = await isPhoneNumberRegistered(fullPhone);
+      if (isRegistered) {
+        onError("This mobile number is already registered. Please login or use a different number.");
+        return;
+      }
+
       await Future.delayed(const Duration(milliseconds: 500));
       onSuccess();
     } catch (e) {

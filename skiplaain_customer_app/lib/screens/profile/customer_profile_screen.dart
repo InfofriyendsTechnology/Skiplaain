@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../utils/popup_utils.dart';
 import '../../services/booking_service.dart';
 import '../booking/booking_ticket_screen.dart';
 import '../my_bookings/my_bookings_screen.dart';
@@ -85,47 +86,25 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     );
   }
 
-  void _onLogout() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141414),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: Color(0xFF262626)),
-        ),
-        title: const Text('Logout Account?', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
-        content: const Text(
-          'This will clear your local session and return you to the connect screen.',
-          style: TextStyle(color: Colors.white70, fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await _authService.logout();
-              if (mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const HomeScreen()),
-                  (route) => false,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
+  void _onLogout() async {
+    final confirmed = await PopupUtils.showConfirmation(
+      context,
+      title: 'Logout Account?',
+      message: 'This will clear your local session and return you to the connect screen.',
+      confirmText: 'Logout',
+      cancelText: 'Cancel',
+      isDangerous: true,
     );
+
+    if (confirmed) {
+      await _authService.logout();
+      if (mounted && context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
   }
 
   String _formatPhoneDisplay(String phone) {

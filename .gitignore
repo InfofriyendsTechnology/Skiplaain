@@ -38,8 +38,19 @@ Thumbs.db
 .vscode/
 *.log
 
-# Environment
+# Environment & Secrets
+.env
+*.env
+**/.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# PowerShell Scripts
+*.ps1
+build-all.ps1
+run-*.ps1
+
+# Mapbox Docs
+MAPBOX*.md

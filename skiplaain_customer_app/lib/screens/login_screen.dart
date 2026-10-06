@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../utils/popup_utils.dart';
 import 'home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -21,8 +22,9 @@ class _LoginScreenState extends State<LoginScreen> {
   void _onSendOtp() async {
     final phone = _phoneController.text.trim();
     if (phone.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid 10-digit mobile number')),
+      PopupUtils.showErrorNotification(
+        context,
+        'Please enter a valid 10-digit mobile number',
       );
       return;
     }
@@ -36,12 +38,14 @@ class _LoginScreenState extends State<LoginScreen> {
           _isLoading = false;
           _isOtpSent = true;
         });
+        PopupUtils.showSuccessNotification(
+          context,
+          'OTP sent successfully to +91 $phone',
+        );
       },
       onError: (err) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(err)),
-        );
+        PopupUtils.showErrorNotification(context, err);
       },
     );
   }
@@ -49,8 +53,9 @@ class _LoginScreenState extends State<LoginScreen> {
   void _onVerifyOtp() async {
     final otp = _otpController.text.trim();
     if (otp.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the 6-digit OTP')),
+      PopupUtils.showErrorNotification(
+        context,
+        'Please enter the 6-digit OTP',
       );
       return;
     }
@@ -65,15 +70,19 @@ class _LoginScreenState extends State<LoginScreen> {
           _nameController.text.trim().isEmpty ? 'Customer' : _nameController.text.trim(),
           _phoneController.text.trim(),
         );
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        PopupUtils.showSuccessNotification(
+          context,
+          'Login successful! Welcome to Skiplaain',
         );
+        Future.delayed(const Duration(milliseconds: 500), () {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        });
       },
       onError: (err) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(err)),
-        );
+        PopupUtils.showErrorNotification(context, err);
       },
     );
   }

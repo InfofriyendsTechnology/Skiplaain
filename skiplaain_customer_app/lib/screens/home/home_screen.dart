@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/salon_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/booking_service.dart';
+import '../../utils/popup_utils.dart';
 import '../auth/customer_onboarding_screen.dart';
 import '../booking/booking_confirmation_screen.dart';
 import '../my_bookings/my_bookings_screen.dart';
@@ -99,211 +100,180 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // --- MULTI-SHOP SWITCHER MODAL ---
   void _openMyShopsModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final saved = _authService.savedSalons;
-        final currentId = (_authService.connectedSalon?['id'] ?? '').toString();
+    final saved = _authService.savedSalons;
+    final currentId = (_authService.connectedSalon?['id'] ?? '').toString();
 
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.6,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: const BoxDecoration(
-            color: Color(0xFF141414),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border(top: BorderSide(color: Color(0xFF262626), width: 1.5)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+    PopupUtils.showCustomModal(
+      context,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'My Connected Shops',
+                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-              ),
-              const SizedBox(height: 18),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Switch between your regular salons or connect a new one',
+              style: TextStyle(color: Color(0xFFA0A0A0), fontSize: 13),
+            ),
+            const SizedBox(height: 20),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'My Connected Shops',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20),
-                    onPressed: () => Navigator.of(ctx).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Switch between your regular salons or connect a new one',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-              const SizedBox(height: 16),
-
-              InkWell(
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  setState(() {
-                    _authService.disconnectSalon();
-                    _selectedServiceIndices.clear();
-                  });
-                },
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF162B16),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.4)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF00FF00), size: 20),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Scan / Connect Another Shop',
-                          style: TextStyle(color: Color(0xFF00FF00), fontSize: 13, fontWeight: FontWeight.w800),
-                        ),
+            InkWell(
+              onTap: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _authService.disconnectSalon();
+                  _selectedServiceIndices.clear();
+                });
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF162B16),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.4)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF00FF00), size: 22),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Scan / Connect Another Shop',
+                        style: TextStyle(color: Color(0xFF00FF00), fontSize: 14, fontWeight: FontWeight.w700),
                       ),
-                      Icon(Icons.add_rounded, color: Color(0xFF00FF00), size: 18),
-                    ],
-                  ),
+                    ),
+                    Icon(Icons.add_rounded, color: Color(0xFF00FF00), size: 20),
+                  ],
                 ),
               ),
+            ),
 
-              const SizedBox(height: 18),
-              const Text(
-                'Saved Salons',
-                style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 10),
+            const SizedBox(height: 20),
+            const Text(
+              'Saved Salons',
+              style: TextStyle(color: Color(0xFFA0A0A0), fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
 
-              Expanded(
-                child: saved.isEmpty
-                    ? const Center(
-                        child: Text('No saved salons yet', style: TextStyle(color: Colors.white38, fontSize: 13)),
-                      )
-                    : ListView.builder(
-                        itemCount: saved.length,
-                        itemBuilder: (context, index) {
-                          final s = saved[index];
-                          final sId = (s['id'] ?? '').toString();
-                          final sName = (s['salonName'] ?? s['businessName'] ?? 'Salon').toString();
-                          final sAddr = (s['address'] ?? s['location'] ?? 'Surat').toString();
-                          final isCurrent = sId == currentId;
+            Flexible(
+              child: saved.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Text('No saved salons yet', style: TextStyle(color: Color(0xFF666666), fontSize: 14)),
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: saved.length,
+                      itemBuilder: (ctx, index) {
+                        final s = saved[index];
+                        final sId = (s['id'] ?? '').toString();
+                        final sName = (s['salonName'] ?? s['businessName'] ?? 'Salon').toString();
+                        final sAddr = (s['address'] ?? s['location'] ?? 'Surat').toString();
+                        final isCurrent = sId == currentId;
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            decoration: BoxDecoration(
-                              color: isCurrent ? const Color(0xFF1E1E1E) : const Color(0xFF161616),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isCurrent ? const Color(0xFF00FF00) : const Color(0xFF262626),
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: isCurrent ? const Color(0xFF1E1E1E) : const Color(0xFF0A0A0A),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isCurrent ? const Color(0xFF00FF00) : const Color(0xFF262626),
+                            ),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            leading: Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00FF00).withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                sName.isNotEmpty ? sName[0].toUpperCase() : 'S',
+                                style: const TextStyle(color: Color(0xFF00FF00), fontWeight: FontWeight.bold, fontSize: 18),
                               ),
                             ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                              leading: Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF00FF00).withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(10),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(sName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15)),
                                 ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  sName.isNotEmpty ? sName[0].toUpperCase() : 'S',
-                                  style: const TextStyle(color: Color(0xFF00FF00), fontWeight: FontWeight.w900, fontSize: 16),
-                                ),
-                              ),
-                              title: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(sName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
-                                  ),
-                                  if (isCurrent)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF00FF00),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Text('ACTIVE', style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.w900)),
+                                if (isCurrent)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF00FF00),
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
-                                ],
-                              ),
-                              subtitle: Text(sAddr, style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                              trailing: isCurrent
-                                  ? const Icon(Icons.check_circle_rounded, color: Color(0xFF00FF00), size: 18)
-                                  : const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 13),
-                              onTap: () {
-                                _authService.switchActiveSalon(s);
-                                Navigator.of(ctx).pop();
-                                setState(() {
-                                  _selectedServiceIndices.clear();
-                                });
-                              },
+                                    child: const Text('ACTIVE', style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  ),
+                              ],
                             ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(sAddr, style: const TextStyle(color: Color(0xFFA0A0A0), fontSize: 12)),
+                            ),
+                            trailing: isCurrent
+                                ? const Icon(Icons.check_circle_rounded, color: Color(0xFF00FF00), size: 20)
+                                : const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF666666), size: 16),
+                            onTap: () {
+                              _authService.switchActiveSalon(s);
+                              Navigator.of(context).pop();
+                              setState(() {
+                                _selectedServiceIndices.clear();
+                              });
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  void _onLogout() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141414),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: Color(0xFF262626)),
-        ),
-        title: const Text('Logout Account?', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
-        content: const Text(
-          'This will clear your local session cache and log you out.',
-          style: TextStyle(color: Colors.white70, fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await _authService.logout();
-              setState(() {
-                _selectedServiceIndices.clear();
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
+  void _onLogout() async {
+    final confirmed = await PopupUtils.showConfirmation(
+      context,
+      title: 'Logout Account?',
+      message: 'This will clear your local session cache and log you out.',
+      confirmText: 'Logout',
+      cancelText: 'Cancel',
+      isDangerous: true,
     );
+
+    if (confirmed) {
+      await _authService.logout();
+      if (mounted) {
+        setState(() {
+          _selectedServiceIndices.clear();
+        });
+      }
+    }
   }
 
   @override
@@ -1293,162 +1263,145 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   void _openCitySelectorModal() {
     String cityFilter = '';
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (modalContext, setModalState) {
-            final filteredCities = _popularCities.where((c) {
-              if (cityFilter.isEmpty) return true;
-              return c.toLowerCase().contains(cityFilter.toLowerCase());
-            }).toList();
+    
+    PopupUtils.showCustomModal(
+      context,
+      child: StatefulBuilder(
+        builder: (modalContext, setModalState) {
+          final filteredCities = _popularCities.where((c) {
+            if (cityFilter.isEmpty) return true;
+            return c.toLowerCase().contains(cityFilter.toLowerCase());
+          }).toList();
 
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.65,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: const BoxDecoration(
-                color: Color(0xFF141414),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                border: Border(top: BorderSide(color: Color(0xFF262626), width: 1.5)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Select Your City',
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
+                      onPressed: () => Navigator.of(modalContext).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                TextField(
+                  onChanged: (val) => setModalState(() => cityFilter = val.trim()),
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  decoration: InputDecoration(
+                    hintText: 'Search city...',
+                    hintStyle: const TextStyle(color: Color(0xFF666666), fontSize: 14),
+                    prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFA0A0A0), size: 20),
+                    filled: true,
+                    fillColor: const Color(0xFF0A0A0A),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF262626)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF262626)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00FF00), width: 2),
                     ),
                   ),
-                  const SizedBox(height: 18),
+                ),
+                const SizedBox(height: 20),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Select Your City',
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20),
-                        onPressed: () => Navigator.of(modalContext).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    onChanged: (val) => setModalState(() => cityFilter = val.trim()),
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: 'Search city...',
-                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-                      prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54, size: 18),
-                      filled: true,
-                      fillColor: const Color(0xFF1E1E1E),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF262626)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF262626)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF00FF00)),
-                      ),
+                InkWell(
+                  onTap: () {
+                    setState(() => _selectedCity = 'Surat');
+                    Navigator.of(modalContext).pop();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF162B16),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.my_location_rounded, color: Color(0xFF00FF00), size: 20),
+                        SizedBox(width: 12),
+                        Text(
+                          'Use Current Location',
+                          style: TextStyle(color: Color(0xFF00FF00), fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                ),
+                const SizedBox(height: 20),
 
-                  InkWell(
-                    onTap: () {
-                      setState(() => _selectedCity = 'Surat');
-                      Navigator.of(modalContext).pop();
+                const Text(
+                  'Available Cities',
+                  style: TextStyle(color: Color(0xFFA0A0A0), fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: filteredCities.length,
+                    itemBuilder: (context, index) {
+                      final city = filteredCities[index];
+                      final isSelected = _selectedCity == city;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF1E1E1E) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: Icon(
+                            Icons.location_city_rounded,
+                            color: isSelected ? const Color(0xFF00FF00) : Color(0xFF666666),
+                            size: 20,
+                          ),
+                          title: Text(
+                            city,
+                            style: TextStyle(
+                              color: isSelected ? const Color(0xFF00FF00) : Colors.white,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              fontSize: 15,
+                            ),
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_rounded, color: Color(0xFF00FF00), size: 20)
+                              : null,
+                          onTap: () {
+                            setState(() => _selectedCity = city);
+                            Navigator.of(modalContext).pop();
+                          },
+                        ),
+                      );
                     },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF162B16),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3)),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.my_location_rounded, color: Color(0xFF00FF00), size: 18),
-                          SizedBox(width: 10),
-                          Text(
-                            'Use Current Location',
-                            style: TextStyle(color: Color(0xFF00FF00), fontSize: 13, fontWeight: FontWeight.w700),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    'Available Cities',
-                    style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 10),
-
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: filteredCities.length,
-                      itemBuilder: (context, index) {
-                        final city = filteredCities[index];
-                        final isSelected = _selectedCity == city;
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF1E1E1E) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ListTile(
-                            dense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                            leading: Icon(
-                              Icons.location_city_rounded,
-                              color: isSelected ? const Color(0xFF00FF00) : Colors.white38,
-                              size: 18,
-                            ),
-                            title: Text(
-                              city,
-                              style: TextStyle(
-                                color: isSelected ? const Color(0xFF00FF00) : Colors.white,
-                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                                fontSize: 14,
-                              ),
-                            ),
-                            trailing: isSelected
-                                ? const Icon(Icons.check_rounded, color: Color(0xFF00FF00), size: 18)
-                                : null,
-                            onTap: () {
-                              setState(() => _selectedCity = city);
-                              Navigator.of(modalContext).pop();
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

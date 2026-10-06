@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'services/partner_service.dart';
+import 'services/mapbox_service.dart';
 import 'screens/splash_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await dotenv.load(fileName: ".env");
+  
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  MapboxService().init(dotenv.env['MAPBOX_API_KEY'] ?? '');
+  
   await PartnerService().initSession();
+  
   runApp(const SkiplaainPartnerApp());
 }
 

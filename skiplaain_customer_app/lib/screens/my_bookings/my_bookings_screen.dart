@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/auth_service.dart';
 import '../../services/booking_service.dart';
+import '../../widgets/status_badge.dart';
+import '../../utils/popup_utils.dart';
+import 'booking_detail_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -13,46 +17,41 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   final BookingService _bookingService = BookingService();
   final CustomerAuthService _authService = CustomerAuthService();
 
-  void _onCancelBooking(String bookingId) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141414),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: Color(0xFF262626)),
-        ),
-        title: const Text('Cancel Appointment?', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
-        content: const Text(
-          'Are you sure you want to cancel this booking slot?',
-          style: TextStyle(color: Colors.white70, fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Keep Appointment', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await _bookingService.cancelBooking(bookingId);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Appointment cancelled successfully')),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Cancel Slot'),
-          ),
-        ],
-      ),
+  void _onCancelBooking(String bookingId) async {
+    HapticFeedback.mediumImpact();
+    
+    final confirmed = await PopupUtils.showConfirmation(
+      context,
+      title: 'Cancel Appointment?',
+      message: 'Are you sure you want to cancel this booking?',
+      confirmText: 'Yes, Cancel',
+      cancelText: 'Keep It',
+      isDangerous: true,
     );
+
+    if (confirmed) {
+      try {
+        await _bookingService.cancelBooking(
+          bookingId,
+          cancelledBy: 'customer',
+          reason: 'Cancelled by customer',
+        );
+        if (mounted) {
+          HapticFeedback.lightImpact();
+          PopupUtils.showSuccessNotification(
+            context,
+            'Appointment cancelled',
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          PopupUtils.showErrorNotification(
+            context,
+            'Failed to cancel appointment',
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -151,89 +150,114 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                     badgeColor = const Color(0xFF38BDF8);
                   }
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF141414),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF262626)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              bookingId,
-                              style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: badgeColor.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: badgeColor.withOpacity(0.3)),
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BookingDetailScreen(
+                            bookingData: b,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141414),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF262626)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                bookingId,
+                                style: const TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
-                              child: Text(
-                                status.toUpperCase(),
-                                style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.w800),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          salonName,
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
-                        ),
-                        if (salonAddress.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(salonAddress, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                        ],
-                        const SizedBox(height: 12),
-                        const Divider(color: Color(0xFF262626), height: 1),
-                        const SizedBox(height: 12),
-
-                        Row(
-                          children: [
-                            const Icon(Icons.access_time_rounded, color: Color(0xFF00FF00), size: 14),
-                            const SizedBox(width: 6),
-                            Text(
-                              '$bookingDate at $timeSlot',
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                            const Spacer(),
-                            Text(
-                              price,
-                              style: const TextStyle(color: Color(0xFF00FF00), fontSize: 16, fontWeight: FontWeight.w900),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Services: $serviceSummary',
-                          style: const TextStyle(color: Colors.white70, fontSize: 12),
-                        ),
-
-                        if (isConfirmed) ...[
-                          const SizedBox(height: 14),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: OutlinedButton(
-                              onPressed: () => _onCancelBooking(b['id']),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFFEF4444),
-                                side: const BorderSide(color: Color(0xFFEF4444)),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: const Text('Cancel Appointment', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                              StatusBadge(status: status, compact: true),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            salonName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
+                          if (salonAddress.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              salonAddress,
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          const Divider(color: Color(0xFF262626), height: 1),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.access_time_rounded,
+                                color: Color(0xFF00FF00),
+                                size: 14,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$bookingDate at $timeSlot',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                price,
+                                style: const TextStyle(
+                                  color: Color(0xFF00FF00),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Services: $serviceSummary',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.white.withOpacity(0.3),
+                                size: 14,
+                              ),
+                            ],
+                          ),
                         ],
-                      ],
+                      ),
                     ),
                   );
                 },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import '../services/auth_service.dart';
+import '../utils/popup_utils.dart';
 import '../utils/transitions.dart';
 import 'otp_screen.dart';
 
@@ -95,8 +96,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           : () {
                               String rawNumber = _phoneController.text.trim().replaceAll(' ', '');
                               if (rawNumber.length != 10) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please enter a valid 10-digit number'), backgroundColor: Colors.red),
+                                PopupUtils.showErrorNotification(
+                                  context,
+                                  'Please enter a valid 10-digit number',
                                 );
                                 return;
                               }
@@ -109,31 +111,70 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _isLoading = true;
                               });
 
-                              _authService.sendOTP(
-                                phoneNumber: finalNumber,
-                                onSuccess: () {
-                                  setState(() {
-                                    _isLoading = false;
-                                  });
-                                  Navigator.push(
-                                    context,
-                                    PremiumTransition(
-                                      page: OtpScreen(
-                                        phoneNumber: finalNumber,
-                                        authService: _authService,
-                                      ),
-                                    ),
+                              // Check if existing partner
+                              _authService.isPhoneNumberRegistered(finalNumber).then((isRegistered) {
+                                if (isRegistered) {
+                                  // Existing partner - Login flow
+                                  _authService.sendOTP(
+                                    phoneNumber: finalNumber,
+                                    onSuccess: () {
+                                      setState(() {
+                                        _isLoading = false;
+                                      });
+                                      PopupUtils.showSuccessNotification(
+                                        context,
+                                        'Welcome back! OTP sent',
+                                      );
+                                      Navigator.push(
+                                        context,
+                                        PremiumTransition(
+                                          page: OtpScreen(
+                                            phoneNumber: finalNumber,
+                                            authService: _authService,
+                                            isNewUser: false,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    onError: (error) {
+                                      setState(() {
+                                        _isLoading = false;
+                                      });
+                                      PopupUtils.showErrorNotification(context, error);
+                                    },
                                   );
-                                },
-                                onError: (error) {
-                                  setState(() {
-                                    _isLoading = false;
-                                  });
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(error), backgroundColor: Colors.red),
+                                } else {
+                                  // New partner - Signup flow
+                                  _authService.sendOTP(
+                                    phoneNumber: finalNumber,
+                                    onSuccess: () {
+                                      setState(() {
+                                        _isLoading = false;
+                                      });
+                                      PopupUtils.showSuccessNotification(
+                                        context,
+                                        'Let\'s set up your salon! OTP sent',
+                                      );
+                                      Navigator.push(
+                                        context,
+                                        PremiumTransition(
+                                          page: OtpScreen(
+                                            phoneNumber: finalNumber,
+                                            authService: _authService,
+                                            isNewUser: true,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    onError: (error) {
+                                      setState(() {
+                                        _isLoading = false;
+                                      });
+                                      PopupUtils.showErrorNotification(context, error);
+                                    },
                                   );
-                                },
-                              );
+                                }
+                              });
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00FF00),

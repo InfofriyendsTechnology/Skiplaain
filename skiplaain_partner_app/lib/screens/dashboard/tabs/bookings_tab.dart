@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../services/partner_service.dart';
+import '../../../services/booking_service.dart';
+import '../../../widgets/status_badge.dart';
 import '../appointment_details_screen.dart';
 
 class BookingsTab extends StatefulWidget {
@@ -10,7 +12,8 @@ class BookingsTab extends StatefulWidget {
 }
 
 class _BookingsTabState extends State<BookingsTab> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final BookingService _bookingService = BookingService();
+  final PartnerService _partnerService = PartnerService();
   String _selectedFilter = 'All'; // 'All', 'Confirmed', 'Completed', 'Cancelled'
 
   Widget _buildFilterChip(String label) {
@@ -52,6 +55,7 @@ class _BookingsTabState extends State<BookingsTab> {
     final status = (booking['status'] ?? 'confirmed').toString();
     final barberName = (booking['barberName'] ?? 'Any Available Barber').toString();
     final bookingId = (booking['bookingId'] ?? booking['id'] ?? '#SKP').toString();
+    final isNew = booking['viewedByPartner'] != true && status.toLowerCase() == 'confirmed';
 
     return GestureDetector(
       onTap: () {
@@ -59,26 +63,30 @@ class _BookingsTabState extends State<BookingsTab> {
           context,
           MaterialPageRoute(
             builder: (context) => AppointmentDetailsScreen(
-              appointmentData: {
-                'customerName': name,
-                'service': service,
-                'time': '$date, $time',
-                'price': price,
-                'status': status,
-                'barberName': barberName,
-                'bookingId': bookingId,
-              },
+              appointmentData: booking,
             ),
           ),
         );
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: const Color(0xFF141414),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF262626)),
+          border: Border.all(
+            color: isNew ? const Color(0xFF00FF00) : const Color(0xFF262626),
+            width: isNew ? 2 : 1,
+          ),
+          boxShadow: isNew
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF00FF00).withOpacity(0.2),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,64 +97,85 @@ class _BookingsTabState extends State<BookingsTab> {
                 Row(
                   children: [
                     Container(
-                      width: 38,
-                      height: 38,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF00FF00).withOpacity(0.12),
-                        border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3)),
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF00FF00).withOpacity(0.2),
+                            const Color(0xFF00FF00).withOpacity(0.1),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: const Color(0xFF00FF00).withOpacity(0.3),
+                        ),
                       ),
                       alignment: Alignment.center,
                       child: Text(
                         name.isNotEmpty ? name[0].toUpperCase() : 'C',
-                        style: const TextStyle(color: Color(0xFF00FF00), fontWeight: FontWeight.w900, fontSize: 16),
+                        style: const TextStyle(
+                          color: Color(0xFF00FF00),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (isNew) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF00FF00),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'NEW',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           bookingId,
-                          style: const TextStyle(color: Colors.white38, fontSize: 11),
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: status.toLowerCase() == 'confirmed'
-                        ? const Color(0xFF00FF00).withOpacity(0.15)
-                        : (status.toLowerCase() == 'completed' ? Colors.blue.withOpacity(0.15) : Colors.red.withOpacity(0.15)),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: status.toLowerCase() == 'confirmed' ? const Color(0xFF00FF00).withOpacity(0.4) : Colors.transparent,
-                    ),
-                  ),
-                  child: Text(
-                    status.toUpperCase(),
-                    style: TextStyle(
-                      color: status.toLowerCase() == 'confirmed' ? const Color(0xFF00FF00) : (status.toLowerCase() == 'completed' ? Colors.blue : Colors.red),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
+                StatusBadge(status: status, compact: true),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             const Divider(color: Color(0xFF222222), height: 1),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -205,21 +234,44 @@ class _BookingsTabState extends State<BookingsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final partnerId = _partnerService.currentPartnerId;
+    
+    if (partnerId == null || partnerId.isEmpty) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Text(
+            'Partner ID not found',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
         title: const Text(
-          'Live Queue & Bookings',
-          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+          'Bookings',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _firestore.collection('bookings').snapshots(),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _bookingService.streamPartnerBookings(partnerId),
         builder: (context, snapshot) {
-          final docs = snapshot.data?.docs ?? [];
-          final List<Map<String, dynamic>> allBookings = docs.map((d) => {'id': d.id, ...d.data()}).toList();
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF00FF00)),
+            );
+          }
+
+          final allBookings = snapshot.data ?? [];
 
           final filteredBookings = allBookings.where((b) {
             if (_selectedFilter == 'All') return true;
@@ -232,7 +284,7 @@ class _BookingsTabState extends State<BookingsTab> {
             children: [
               // Filters
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 10.0),
+                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -249,28 +301,46 @@ class _BookingsTabState extends State<BookingsTab> {
               // List
               Expanded(
                 child: filteredBookings.isEmpty
-                    ? Container(
-                        margin: const EdgeInsets.all(18),
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(32),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF141414),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFF262626)),
-                        ),
-                        child: const Column(
+                    ? Center(
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.calendar_month_outlined, color: Colors.white24, size: 40),
-                            SizedBox(height: 12),
-                            Text('No Bookings Found', style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.bold)),
-                            SizedBox(height: 4),
-                            Text('Appointments booked by customers will appear here in real-time.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, fontSize: 12)),
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF141414),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFF262626)),
+                              ),
+                              child: const Icon(
+                                Icons.calendar_today_outlined,
+                                color: Color(0xFF00FF00),
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No bookings yet',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'New appointments will appear here',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.5),
+                                fontSize: 14,
+                              ),
+                            ),
                           ],
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
                         itemCount: filteredBookings.length,
                         itemBuilder: (context, index) {
                           return _buildBookingCard(context, filteredBookings[index]);

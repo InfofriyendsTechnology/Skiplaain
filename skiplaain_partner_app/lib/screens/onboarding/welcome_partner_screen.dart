@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/transitions.dart';
+import '../../widgets/mapbox_location_picker.dart';
 import 'manage_services_screen.dart';
-import 'map_picker_screen.dart';
 
 class WelcomePartnerScreen extends StatefulWidget {
   final String? phoneNumber;
@@ -152,13 +152,21 @@ class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 16),
               
               // Logo
               Center(
@@ -213,13 +221,15 @@ class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
                       _buildInputField(
                         label: 'LOCATION',
                         controller: _locationController,
-                        hint: 'Tap to select on map',
+                        hint: 'Search and select location on map',
                         readOnly: true,
                         onTap: () async {
                           final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const MapPickerScreen(),
+                              builder: (context) => MapboxLocationPicker(
+                                onLocationSelected: (location) {},
+                              ),
                             ),
                           );
                           if (result != null && result is Map<String, dynamic>) {
@@ -234,7 +244,9 @@ class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
                             final result = await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const MapPickerScreen(),
+                                builder: (context) => MapboxLocationPicker(
+                                  onLocationSelected: (location) {},
+                                ),
                               ),
                             );
                             if (result != null && result is Map<String, dynamic>) {

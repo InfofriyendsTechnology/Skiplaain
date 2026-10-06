@@ -199,8 +199,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   void _onGetQueueToken() {
     if (_selectedIndices.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least 1 service to get queue token')),
+      PopupUtils.showWarning(
+        context,
+        message: 'Please select at least 1 service to get queue token',
       );
       return;
     }

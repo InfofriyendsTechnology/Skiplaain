@@ -1,9 +1,24 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   User? get currentUser => _auth.currentUser;
+
+  /// Check if phone number already registered as partner
+  Future<bool> isPhoneNumberRegistered(String phoneNumber) async {
+    try {
+      final cleanPhone = phoneNumber.trim().replaceAll(RegExp(r'\D'), '');
+      final partnerId = 'partner_$cleanPhone';
+      
+      final doc = await _firestore.collection('partners').doc(partnerId).get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
 
   /// Send OTP to the given phone number (Testing mode: 111111 for ALL numbers)
   Future<void> sendOTP({

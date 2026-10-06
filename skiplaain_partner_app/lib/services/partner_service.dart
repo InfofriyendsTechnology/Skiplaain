@@ -24,6 +24,14 @@ class PartnerService {
     return cleanPhone.isNotEmpty ? 'partner_$cleanPhone' : 'partner_active';
   }
 
+  String? get currentPartnerId {
+    if (_cachedPartnerId != null && _cachedPartnerId!.isNotEmpty) {
+      return _cachedPartnerId!;
+    }
+    final cleanPhone = currentPhone.replaceAll(RegExp(r'\D'), '');
+    return cleanPhone.isNotEmpty ? 'partner_$cleanPhone' : null;
+  }
+
   /// Initialize session from local storage on app start
   Future<void> initSession() async {
     try {
@@ -81,6 +89,19 @@ class PartnerService {
       await prefs.remove('partner_id');
       await _auth.signOut();
     } catch (_) {}
+  }
+
+  /// Check if phone number already exists as a partner
+  Future<bool> isPhoneNumberRegistered(String phoneNumber) async {
+    try {
+      final cleanPhone = phoneNumber.replaceAll(RegExp(r'\D'), '');
+      final partnerId = 'partner_$cleanPhone';
+      
+      final doc = await _firestore.collection('partners').doc(partnerId).get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
   }
 
   /// Save or update full partner profile during Onboarding
