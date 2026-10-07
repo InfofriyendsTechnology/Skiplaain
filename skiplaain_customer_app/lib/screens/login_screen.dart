@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
+import '../services/api_auth_service.dart';
 import '../utils/popup_utils.dart';
 import 'home/home_screen.dart';
 
@@ -14,7 +14,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _nameController = TextEditingController(text: 'Rahul Sharma');
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
-  final CustomerAuthService _authService = CustomerAuthService();
+  final ApiAuthService _authService = ApiAuthService();
 
   bool _isOtpSent = false;
   bool _isLoading = false;
@@ -31,23 +31,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    await _authService.sendOTP(
-      phoneNumber: phone,
-      onSuccess: () {
-        setState(() {
-          _isLoading = false;
-          _isOtpSent = true;
-        });
-        PopupUtils.showSuccessNotification(
-          context,
-          'OTP sent successfully to +91 $phone',
-        );
-      },
-      onError: (err) {
-        setState(() => _isLoading = false);
-        PopupUtils.showErrorNotification(context, err);
-      },
-    );
+    try {
+      await _authService.sendOtp(phone);
+      setState(() {
+        _isLoading = false;
+        _isOtpSent = true;
+      });
+      PopupUtils.showSuccessNotification(
+        context,
+        'OTP sent successfully to +91 $phone',
+      );
+    } catch (err) {
+      setState(() => _isLoading = false);
+      PopupUtils.showErrorNotification(context, err.toString());
+    }
   }
 
   void _onVerifyOtp() async {
@@ -62,33 +59,33 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    await _authService.verifyOTP(
-      otp: otp,
-      onSuccess: () {
-        setState(() => _isLoading = false);
-        _authService.setCustomerProfile(
-          _nameController.text.trim().isEmpty ? 'Customer' : _nameController.text.trim(),
-          _phoneController.text.trim(),
+    try {
+      final customerData = await _authService.verifyOtpAndLogin(
+        phone: _phoneController.text.trim(),
+        otp: otp,
+        name: _nameController.text.trim().isEmpty ? 'Customer' : _nameController.text.trim(),
+      );
+      
+      setState(() => _isLoading = false);
+      
+      PopupUtils.showSuccessNotification(
+        context,
+        'Login successful! Welcome to Skiplaain',
+      );
+      
+      Future.delayed(const Duration(milliseconds: 500), () {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
-        PopupUtils.showSuccessNotification(
-          context,
-          'Login successful! Welcome to Skiplaain',
-        );
-        Future.delayed(const Duration(milliseconds: 500), () {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
-        });
-      },
-      onError: (err) {
-        setState(() => _isLoading = false);
-        PopupUtils.showErrorNotification(context, err);
-      },
-    );
+      });
+    } catch (err) {
+      setState(() => _isLoading = false);
+      PopupUtils.showErrorNotification(context, err.toString());
+    }
   }
 
   void _onContinueAsGuest() {
-    _authService.setCustomerProfile('Guest User', '+919876543210');
+    // Guest mode - just navigate without authentication
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
     );

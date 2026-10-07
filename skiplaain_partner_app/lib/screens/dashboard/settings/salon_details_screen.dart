@@ -10,13 +10,24 @@ class SalonDetailsScreen extends StatefulWidget {
 class _SalonDetailsScreenState extends State<SalonDetailsScreen> {
   final TextEditingController _nameController = TextEditingController(text: 'Yash Styles Salon');
   final TextEditingController _phoneController = TextEditingController(text: '8553535342');
-  final TextEditingController _addressController = TextEditingController(text: '123, Ring Road, Surat, Gujarat 395001');
+  final TextEditingController _shopAddressController = TextEditingController();
+  final TextEditingController _landmarkController = TextEditingController();
+  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _stateController = TextEditingController();
+  final TextEditingController _pincodeController = TextEditingController();
+  
+  double? _latitude;
+  double? _longitude;
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
-    _addressController.dispose();
+    _shopAddressController.dispose();
+    _landmarkController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pincodeController.dispose();
     super.dispose();
   }
 
@@ -106,7 +117,53 @@ class _SalonDetailsScreenState extends State<SalonDetailsScreen> {
               
               _buildTextField('Salon Name', _nameController),
               _buildTextField('Phone Number', _phoneController, keyboardType: TextInputType.phone),
-              _buildTextField('Full Address', _addressController, maxLines: 3),
+              
+              _buildTextField('Shop/Building Address', _shopAddressController, maxLines: 2),
+              _buildTextField('Landmark (Optional)', _landmarkController),
+              
+              Row(
+                children: [
+                  Expanded(child: _buildTextField('City', _cityController)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildTextField('State', _stateController)),
+                ],
+              ),
+              
+              _buildTextField('Pincode', _pincodeController, keyboardType: TextInputType.number),
+              
+              GestureDetector(
+                onTap: () async {
+                  // TODO: Open MapboxLocationPicker
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on, color: Color(0xFF00FF00), size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _latitude != null 
+                            ? 'Location marked on map ✓' 
+                            : 'Mark location on map (Optional)',
+                          style: TextStyle(
+                            color: _latitude != null ? const Color(0xFF00FF00) : Colors.white54,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios, color: Colors.white38, size: 14),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 32),
               
               const Text(
                 'Location on Map',

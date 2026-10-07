@@ -23,6 +23,7 @@ dependencies:
   http: ^1.1.0
   geolocator: ^11.1.0
   flutter_dotenv: ^5.1.0
+  flutter_secure_storage: ^9.0.0  # For JWT token storage
 
 dev_dependencies:
   flutter_test:

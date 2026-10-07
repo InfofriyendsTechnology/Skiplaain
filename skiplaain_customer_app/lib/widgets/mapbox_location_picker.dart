@@ -174,20 +174,27 @@ class _MapboxLocationPickerState extends State<MapboxLocationPicker> {
       ),
       body: Stack(
         children: [
-          // Mapbox Map
+          // Mapbox Map with production settings
           MapboxMap(
             accessToken: _mapboxService.apiKey ?? '',
             initialCameraPosition: CameraPosition(
               target: _currentPosition,
-              zoom: 16,
+              zoom: 15,
             ),
-            onMapCreated: (controller) {
+            onMapCreated: (controller) async {
               _mapController = controller;
+              await controller.setSymbolIconAllowOverlap(true);
+              await controller.setSymbolTextAllowOverlap(false);
             },
             onMapClick: (point, latLng) => _onMapTap(latLng),
             styleString: 'mapbox://styles/mapbox/streets-v12',
+            compassEnabled: true,
+            rotateGesturesEnabled: true,
+            tiltGesturesEnabled: true,
+            minMaxZoomPreference: const MinMaxZoomPreference(10, 20),
             myLocationEnabled: true,
             myLocationTrackingMode: MyLocationTrackingMode.None,
+            myLocationRenderMode: MyLocationRenderMode.NORMAL,
           ),
 
           // Center Pin

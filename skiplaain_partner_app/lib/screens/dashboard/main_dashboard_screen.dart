@@ -41,7 +41,6 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
       final currentCount = confirmedBookings.length;
 
       if (currentCount > _previousBookingCount && _previousBookingCount > 0) {
-        // New booking arrived!
         final newBooking = confirmedBookings.first;
         final customerName = newBooking['customerName'] ?? 'Customer';
         
@@ -68,16 +67,12 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: _tabs[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Color(0xFF1A1A1A), width: 1),
-          ),
-        ),
-        child: Theme(
-          data: ThemeData(
-            splashColor: Colors.transparent,
-            highlightColor: Colors.transparent,
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: Color(0xFF1A1A1A), width: 1),
+            ),
           ),
           child: BottomNavigationBar(
             backgroundColor: Colors.black,
@@ -87,8 +82,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             type: BottomNavigationBarType.fixed,
             showSelectedLabels: true,
             showUnselectedLabels: true,
-            selectedFontSize: 12,
-            unselectedFontSize: 12,
+            selectedFontSize: 11,
+            unselectedFontSize: 11,
+            elevation: 0,
             onTap: (index) {
               setState(() {
                 _currentIndex = index;
@@ -96,47 +92,19 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             },
             items: const [
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: EdgeInsets.only(bottom: 4.0),
-                  child: Icon(Icons.home_outlined),
-                ),
-                activeIcon: Padding(
-                  padding: EdgeInsets.only(bottom: 4.0),
-                  child: Icon(Icons.home),
-                ),
+                icon: Icon(Icons.home_rounded, size: 24),
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: EdgeInsets.only(bottom: 4.0),
-                  child: Icon(Icons.calendar_month_outlined),
-                ),
-                activeIcon: Padding(
-                  padding: EdgeInsets.only(bottom: 4.0),
-                  child: Icon(Icons.calendar_month),
-                ),
+                icon: Icon(Icons.calendar_today_rounded, size: 22),
                 label: 'Bookings',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: EdgeInsets.only(bottom: 4.0),
-                  child: Icon(Icons.people_outline),
-                ),
-                activeIcon: Padding(
-                  padding: EdgeInsets.only(bottom: 4.0),
-                  child: Icon(Icons.people),
-                ),
+                icon: Icon(Icons.people_rounded, size: 24),
                 label: 'Customers',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
-                  padding: EdgeInsets.only(bottom: 4.0),
-                  child: Icon(Icons.person_outline),
-                ),
-                activeIcon: Padding(
-                  padding: EdgeInsets.only(bottom: 4.0),
-                  child: Icon(Icons.person),
-                ),
+                icon: Icon(Icons.person_rounded, size: 24),
                 label: 'Profile',
               ),
             ],

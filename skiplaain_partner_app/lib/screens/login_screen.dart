@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
-import '../services/auth_service.dart';
+import '../services/api_partner_service.dart'; // NEW: API-based service
 import '../utils/popup_utils.dart';
 import '../utils/transitions.dart';
 import 'otp_screen.dart';
@@ -14,7 +14,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
-  final AuthService _authService = AuthService();
+  final ApiPartnerService _authService = ApiPartnerService(); // NEW: Using API service
   String _completePhoneNumber = "";
   bool _isLoading = false;
 
@@ -103,78 +103,33 @@ class _LoginScreenState extends State<LoginScreen> {
                                 return;
                               }
                               
-                              // Strictly format for Firebase
+                              // Strictly format for API
                               String finalNumber = "+91$rawNumber";
-                              print("Sending OTP to: \$finalNumber"); // Debug log
+                              print("Sending OTP to: $finalNumber"); // Debug log
 
                               setState(() {
                                 _isLoading = true;
                               });
 
-                              // Check if existing partner
-                              _authService.isPhoneNumberRegistered(finalNumber).then((isRegistered) {
-                                if (isRegistered) {
-                                  // Existing partner - Login flow
-                                  _authService.sendOTP(
-                                    phoneNumber: finalNumber,
-                                    onSuccess: () {
-                                      setState(() {
-                                        _isLoading = false;
-                                      });
-                                      PopupUtils.showSuccessNotification(
-                                        context,
-                                        'Welcome back! OTP sent',
-                                      );
-                                      Navigator.push(
-                                        context,
-                                        PremiumTransition(
-                                          page: OtpScreen(
-                                            phoneNumber: finalNumber,
-                                            authService: _authService,
-                                            isNewUser: false,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    onError: (error) {
-                                      setState(() {
-                                        _isLoading = false;
-                                      });
-                                      PopupUtils.showErrorNotification(context, error);
-                                    },
-                                  );
-                                } else {
-                                  // New partner - Signup flow
-                                  _authService.sendOTP(
-                                    phoneNumber: finalNumber,
-                                    onSuccess: () {
-                                      setState(() {
-                                        _isLoading = false;
-                                      });
-                                      PopupUtils.showSuccessNotification(
-                                        context,
-                                        'Let\'s set up your salon! OTP sent',
-                                      );
-                                      Navigator.push(
-                                        context,
-                                        PremiumTransition(
-                                          page: OtpScreen(
-                                            phoneNumber: finalNumber,
-                                            authService: _authService,
-                                            isNewUser: true,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    onError: (error) {
-                                      setState(() {
-                                        _isLoading = false;
-                                      });
-                                      PopupUtils.showErrorNotification(context, error);
-                                    },
-                                  );
-                                }
+                              // STATIC OTP MODE - SKIP API CALL
+                              setState(() {
+                                _isLoading = false;
                               });
+
+                              PopupUtils.showSuccessNotification(
+                                context,
+                                'Use static OTP: 111111',
+                              );
+                              Navigator.push(
+                                context,
+                                PremiumTransition(
+                                  page: OtpScreen(
+                                    phoneNumber: finalNumber,
+                                    authService: _authService,
+                                    isNewUser: false,
+                                  ),
+                                ),
+                              );
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00FF00),

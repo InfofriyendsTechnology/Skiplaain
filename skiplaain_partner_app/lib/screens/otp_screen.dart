@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/auth_service.dart';
-import '../services/partner_service.dart';
+import '../services/api_partner_service.dart'; // NEW: API service
 import '../utils/popup_utils.dart';
 import '../utils/transitions.dart';
 import 'onboarding/welcome_partner_screen.dart';
@@ -11,7 +9,7 @@ import 'dashboard/main_dashboard_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
-  final AuthService authService;
+  final ApiPartnerService authService; // NEW: Changed type
   final bool isNewUser;
 
   const OtpScreen({
@@ -64,18 +62,11 @@ class _OtpScreenState extends State<OtpScreen> {
   void _resendOTP() {
     if (!_canResend) return;
 
-    widget.authService.sendOTP(
-      phoneNumber: widget.phoneNumber,
-      onSuccess: () {
-        _startResendTimer();
-        PopupUtils.showSuccessNotification(
-          context,
-          'OTP sent again successfully!',
-        );
-      },
-      onError: (error) {
-        PopupUtils.showErrorNotification(context, error);
-      },
+    // SKIP OTP SENDING - STATIC MODE
+    _startResendTimer();
+    PopupUtils.showSuccessNotification(
+      context,
+      'Use static OTP: 111111',
     );
   }
 
@@ -86,7 +77,7 @@ class _OtpScreenState extends State<OtpScreen> {
     super.dispose();
   }
 
-  void _verifyOTP() {
+  void _verifyOTP() async {
     final cleanOtp = _otpController.text.trim();
     if (cleanOtp.length != 6) {
       PopupUtils.showErrorNotification(
@@ -100,63 +91,34 @@ class _OtpScreenState extends State<OtpScreen> {
       _isLoading = true;
     });
 
-    widget.authService.verifyOTP(
-      otp: cleanOtp,
-      onSuccess: () async {
-        final cleanPhone = widget.phoneNumber.replaceAll(RegExp(r'\D'), '');
-        final targetId = 'partner_$cleanPhone';
+    // OFFLINE STATIC OTP MODE - NO API CALL
+    await Future.delayed(const Duration(milliseconds: 500)); // Simulate processing
+    
+    if (!mounted) return;
+    setState(() => _isLoading = false);
 
-        // 1. Save session to SharedPreferences immediately
-        await PartnerService().savePartnerSession(phoneNumber: widget.phoneNumber, partnerId: targetId);
+    if (cleanOtp == '111111') {
+      // Static OTP accepted
+      PopupUtils.showSuccessNotification(
+        context,
+        'Welcome to Skiplaain!',
+      );
 
-        // 2. Create / merge partner entry in Firestore
-        try {
-          await FirebaseFirestore.instance.collection('partners').doc(targetId).set({
-            'id': targetId,
-            'phone': widget.phoneNumber,
-            'status': 'active',
-            'lastActive': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        } catch (_) {}
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
 
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-
-        PopupUtils.showSuccessNotification(
-          context,
-          widget.isNewUser 
-              ? 'Phone verified! Let\'s set up your salon'
-              : 'Welcome back to Skiplaain!',
-        );
-
-        // Small delay for notification visibility before navigation
-        await Future.delayed(const Duration(milliseconds: 400));
-
-        if (!mounted) return;
-
-        if (widget.isNewUser) {
-          // New user - always go to onboarding
-          Navigator.pushAndRemoveUntil(
-            context,
-            PremiumTransition(page: WelcomePartnerScreen(phoneNumber: widget.phoneNumber)),
-            (route) => false,
-          );
-        } else {
-          // Existing user - go to dashboard
-          Navigator.pushAndRemoveUntil(
-            context,
-            PremiumTransition(page: const MainDashboardScreen()),
-            (route) => false,
-          );
-        }
-      },
-      onError: (error) {
-        setState(() {
-          _isLoading = false;
-        });
-        PopupUtils.showErrorNotification(context, error);
-      },
-    );
+      // Navigate to onboarding for new partner
+      Navigator.pushAndRemoveUntil(
+        context,
+        PremiumTransition(page: WelcomePartnerScreen(phoneNumber: widget.phoneNumber)),
+        (route) => false,
+      );
+    } else {
+      PopupUtils.showErrorNotification(
+        context,
+        'Invalid OTP. Please use 111111',
+      );
+    }
   }
 
   @override

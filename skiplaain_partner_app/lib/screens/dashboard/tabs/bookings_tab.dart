@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../services/partner_service.dart';
-import '../../../services/booking_service.dart';
+import '../../../services/api_partner_service.dart';
 import '../../../widgets/status_badge.dart';
 import '../appointment_details_screen.dart';
 
@@ -12,9 +11,42 @@ class BookingsTab extends StatefulWidget {
 }
 
 class _BookingsTabState extends State<BookingsTab> {
-  final BookingService _bookingService = BookingService();
-  final PartnerService _partnerService = PartnerService();
+  final ApiPartnerService _partnerService = ApiPartnerService();
   String _selectedFilter = 'All'; // 'All', 'Confirmed', 'Completed', 'Cancelled'
+  List<Map<String, dynamic>> _bookings = [];
+  bool _isLoading = true;
+  String? _partnerId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPartnerData();
+  }
+
+  Future<void> _loadPartnerData() async {
+    try {
+      final partnerData = await _partnerService.getCurrentPartner();
+      _partnerId = partnerData['id'].toString();
+      await _loadBookings();
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadBookings() async {
+    if (_partnerId == null) return;
+    
+    setState(() => _isLoading = true);
+    try {
+      final bookings = await _partnerService.getPartnerBookings(_partnerId!);
+      setState(() {
+        _bookings = bookings;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   Widget _buildFilterChip(String label) {
     bool isSelected = _selectedFilter == label;
@@ -47,14 +79,25 @@ class _BookingsTabState extends State<BookingsTab> {
   }
 
   Widget _buildBookingCard(BuildContext context, Map<String, dynamic> booking) {
-    final name = (booking['customerName'] ?? 'Customer').toString();
-    final service = (booking['service'] ?? 'Haircut').toString();
-    final price = (booking['price'] ?? '₹${booking['totalAmount'] ?? 0}').toString();
+    final customerData = booking['customer'] as Map<String, dynamic>?;
+    final name = (customerData?['name'] ?? booking['customerName'] ?? 'Customer').toString();
+    
+    final services = booking['bookingServices'] as List<dynamic>?;
+    final service = services?.isNotEmpty == true 
+        ? (services!.first['service']?['name'] ?? 'Service').toString()
+        : 'Service';
+    
+    final totalAmount = booking['totalAmount'] ?? 0;
+    final price = '₹$totalAmount';
+    
     final date = (booking['bookingDate'] ?? 'Today').toString();
-    final time = (booking['timeSlot'] ?? booking['time'] ?? 'Walk-in').toString();
+    final time = (booking['timeSlot'] ?? 'Walk-in').toString();
     final status = (booking['status'] ?? 'confirmed').toString();
-    final barberName = (booking['barberName'] ?? 'Any Available Barber').toString();
-    final bookingId = (booking['bookingId'] ?? booking['id'] ?? '#SKP').toString();
+    
+    final barberData = booking['barber'] as Map<String, dynamic>?;
+    final barberName = (barberData?['name'] ?? 'Any Available Barber').toString();
+    
+    final bookingId = '#${booking['id'] ?? 'SKP'}';
     final isNew = booking['viewedByPartner'] != true && status.toLowerCase() == 'confirmed';
 
     return GestureDetector(
@@ -234,20 +277,6 @@ class _BookingsTabState extends State<BookingsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final partnerId = _partnerService.currentPartnerId;
-    
-    if (partnerId == null || partnerId.isEmpty) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: Text(
-            'Partner ID not found',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -262,95 +291,97 @@ class _BookingsTabState extends State<BookingsTab> {
           ),
         ),
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _bookingService.streamPartnerBookings(partnerId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
+      body: _isLoading
+          ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF00FF00)),
-            );
-          }
-
-          final allBookings = snapshot.data ?? [];
-
-          final filteredBookings = allBookings.where((b) {
-            if (_selectedFilter == 'All') return true;
-            final status = (b['status'] ?? 'confirmed').toString().toLowerCase();
-            return status == _selectedFilter.toLowerCase();
-          }).toList();
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Filters
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildFilterChip('All'),
-                      _buildFilterChip('Confirmed'),
-                      _buildFilterChip('Completed'),
-                      _buildFilterChip('Cancelled'),
-                    ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Filters
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterChip('All'),
+                        _buildFilterChip('Confirmed'),
+                        _buildFilterChip('Completed'),
+                        _buildFilterChip('Cancelled'),
+                      ],
+                    ),
                   ),
                 ),
-              ),
 
-              // List
-              Expanded(
-                child: filteredBookings.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF141414),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: const Color(0xFF262626)),
+                // List
+                Expanded(
+                  child: Builder(
+                    builder: (context) {
+                      final filteredBookings = _bookings.where((b) {
+                        if (_selectedFilter == 'All') return true;
+                        final status = (b['status'] ?? 'confirmed').toString().toLowerCase();
+                        return status == _selectedFilter.toLowerCase();
+                      }).toList();
+
+                      if (filteredBookings.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF141414),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: const Color(0xFF262626)),
+                                ),
+                                child: const Icon(
+                                  Icons.calendar_today_outlined,
+                                  color: Color(0xFF00FF00),
+                                  size: 28,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.calendar_today_outlined,
-                                color: Color(0xFF00FF00),
-                                size: 28,
+                              const SizedBox(height: 16),
+                              const Text(
+                                'No bookings yet',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'No bookings yet',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                              const SizedBox(height: 8),
+                              Text(
+                                'New appointments will appear here',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 14,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'New appointments will appear here',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        );
+                      }
+
+                      return RefreshIndicator(
+                        color: const Color(0xFF00FF00),
+                        backgroundColor: const Color(0xFF141414),
+                        onRefresh: _loadBookings,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          itemCount: filteredBookings.length,
+                          itemBuilder: (context, index) {
+                            return _buildBookingCard(context, filteredBookings[index]);
+                          },
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        itemCount: filteredBookings.length,
-                        itemBuilder: (context, index) {
-                          return _buildBookingCard(context, filteredBookings[index]);
-                        },
-                      ),
-              ),
-            ],
-          );
-        },
-      ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

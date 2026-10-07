@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Google Material Design 3 inspired centralized popup system
-/// Provides consistent, beautiful, and accessible dialogs across the app
 class PopupUtils {
-  // Private constructor to prevent instantiation
   PopupUtils._();
 
-  /// Show success popup with checkmark animation
-  static Future<void> showSuccess(
-    BuildContext context, {
+  static Future<void> showSuccess(ontext context, {
     required String message,
     String? title,
     Duration duration = const Duration(seconds: 3),
@@ -24,7 +19,6 @@ class PopupUtils {
     );
   }
 
-  /// Show error popup with clear error message
   static Future<void> showError(
     BuildContext context, {
     required String message,
@@ -41,7 +35,6 @@ class PopupUtils {
     );
   }
 
-  /// Show warning popup for important but non-critical messages
   static Future<void> showWarning(
     BuildContext context, {
     required String message,
@@ -58,7 +51,6 @@ class PopupUtils {
     );
   }
 
-  /// Show info popup for general information
   static Future<void> showInfo(
     BuildContext context, {
     required String message,
@@ -75,7 +67,6 @@ class PopupUtils {
     );
   }
 
-  /// Show confirmation dialog with yes/no actions
   static Future<bool> showConfirmation(
     BuildContext context, {
     required String message,

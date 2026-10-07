@@ -1,0 +1,176 @@
+// Skiplaain Database Schema
+// Maps Firebase Firestore collections to PostgreSQL tables
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Partner (Salon) Model
+model Partner {
+  id                String    @id @default(uuid())
+  phone             String    @unique
+  ownerName         String    @map("owner_name")
+  salonName         String    @map("salon_name")
+  address           String
+  city              String?
+  pincode           String?
+  email             String?
+  latitude          Float?
+  longitude         Float?
+  status            String    @default("pending") // pending, approved, blocked
+  profileImage      String?   @map("profile_image")
+  totalAppointments Int       @default(0) @map("total_appointments")
+  totalEarnings     Float     @default(0) @map("total_earnings")
+  rating            Float?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  
+  barbers           Barber[]
+  services          Service[]
+  bookings          Booking[]
+  memberships       Membership[]
+
+  @@map("partners")
+}
+
+// Barber/Stylist Model
+model Barber {
+  id          String   @id @default(uuid())
+  partnerId   String   @map("partner_id")
+  name        String
+  phone       String?
+  specialty   String?
+  image       String?
+  isAvailable Boolean  @default(true) @map("is_available")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  partner     Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+
+  @@map("barbers")
+}
+
+// Service Model (Haircut, Shave, Facial, etc.)
+model Service {
+  id          String   @id @default(uuid())
+  partnerId   String   @map("partner_id")
+  name        String
+  price       Float
+  duration    Int      // in minutes
+  description String?
+  image       String?
+  category    String?  // haircut, shave, facial, spa, etc.
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  partner          Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  bookingServices  BookingService[]
+
+  @@map("services")
+}
+
+// Customer Model
+model Customer {
+  id              String   @id @default(uuid())
+  phone           String   @unique
+  name            String
+  email           String?
+  activeSalonId   String?  @map("active_salon_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  bookings        Booking[]
+  memberships     Membership[]
+
+  @@map("customers")
+}
+
+// Booking/Appointment Model
+model Booking {
+  id                   String    @id @default(uuid())
+  bookingId            String    @unique @map("booking_id") // SKP-xxxxx
+  partnerId            String    @map("partner_id")
+  customerId           String    @map("customer_id")
+  barberId             String?   @map("barber_id")
+  customerName         String    @map("customer_name")
+  customerPhone        String    @map("customer_phone")
+  salonName            String    @map("salon_name")
+  salonPhone           String    @map("salon_phone")
+  salonAddress         String    @map("salon_address")
+  barberName           String?   @map("barber_name")
+  totalAmount          Float     @map("total_amount")
+  bookingDate          String    @map("booking_date") // YYYY-MM-DD
+  timeSlot             String    @map("time_slot")
+  specialInstructions  String?   @map("special_instructions")
+  status               String    @default("confirmed") // confirmed, completed, cancelled
+  completedAt          DateTime? @map("completed_at")
+  completedBy          String?   @map("completed_by")
+  cancelledAt          DateTime? @map("cancelled_at")
+  cancelledBy          String?   @map("cancelled_by")
+  cancelReason         String?   @map("cancel_reason")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  partner              Partner   @relation(fields: [partnerId], references: [id])
+  customer             Customer  @relation(fields: [customerId], references: [id])
+  barber               Barber?   @relation(fields: [barberId], references: [id])
+  services             BookingService[]
+
+  @@map("bookings")
+}
+
+// Booking Services Junction Table
+model BookingService {
+  id         String  @id @default(uuid())
+  bookingId  String  @map("booking_id")
+  serviceId  String  @map("service_id")
+  name       String
+  price      Float
+  duration   Int
+
+  booking    Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  service    Service @relation(fields: [serviceId], references: [id])
+
+  @@map("booking_services")
+}
+
+// VIP Membership Model
+model Membership {
+  id              String   @id @default(uuid())
+  membershipId    String   @unique @map("membership_id") // VIP-xxxxx
+  partnerId       String   @map("partner_id")
+  customerId      String   @map("customer_id")
+  salonName       String   @map("salon_name")
+  customerName    String   @map("customer_name")
+  customerPhone   String   @map("customer_phone")
+  planName        String   @map("plan_name")
+  price           Int
+  durationMonths  Int      @map("duration_months")
+  status          String   @default("active") // active, expired, cancelled
+  activatedAt     DateTime @map("activated_at")
+  expiresAt       DateTime @map("expires_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  partner         Partner  @relation(fields: [partnerId], references: [id])
+  customer        Customer @relation(fields: [customerId], references: [id])
+
+  @@map("memberships")
+}
+
+// OTP Verification Model
+model OtpVerification {
+  id          String   @id @default(uuid())
+  phone       String
+  otp         String
+  purpose     String   // login, signup
+  expiresAt   DateTime @map("expires_at")
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("otp_verifications")
+}

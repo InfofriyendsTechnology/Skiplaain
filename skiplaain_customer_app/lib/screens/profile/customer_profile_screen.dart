@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
+import '../../services/api_service.dart';
+import '../../services/api_auth_service.dart';
 import '../../utils/popup_utils.dart';
-import '../../services/booking_service.dart';
+import '../../services/api_booking_service.dart';
 import '../booking/booking_ticket_screen.dart';
 import '../my_bookings/my_bookings_screen.dart';
 import '../home/home_screen.dart';
@@ -14,8 +15,9 @@ class CustomerProfileScreen extends StatefulWidget {
 }
 
 class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
-  final CustomerAuthService _authService = CustomerAuthService();
-  final BookingService _bookingService = BookingService();
+  final ApiService _apiService = ApiService();
+  final ApiBookingService _bookingService = ApiBookingService();
+  final ApiAuthService _authService = ApiAuthService();
 
   void _showEditNameDialog() {
     final controller = TextEditingController(text: _authService.customerName);
@@ -179,15 +181,15 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   _buildGuestLoginBanner()
                 else ...[
                   // 2. STATS OVERVIEW & SALON VISITS DATA STREAM
-                  StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: _bookingService.streamCustomerBookings(customerPhone),
+                  FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _getRecentBookings(),
                     builder: (context, bookingsSnapshot) {
                       final bookings = bookingsSnapshot.data ?? [];
 
-                      return StreamBuilder<List<Map<String, dynamic>>>(
-                        stream: _bookingService.streamCustomerMemberships(customerPhone),
+                      return FutureBuilder<int>(
+                        future: _getMembershipCount(),
                         builder: (context, membershipsSnapshot) {
-                          final memberships = membershipsSnapshot.data ?? [];
+                          final memberships = <Map<String, dynamic>>[];
                           final activeMemberships = memberships.where((m) => m['status'] == 'active').toList();
 
                           // Calculate stats
@@ -251,7 +253,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                   subtitle: 'Scan a salon QR or get a queue pass to start tracking your visits here.',
                                 )
                               else
-                                ...salonBreakdown.values.map((salonData) => _buildSalonVisitCard(salonData, activeMemberships)),
+                                ...salonBreakdown.values.map((salonData) => _buildSalonVisitCard(salonData, activeMemberships.toList())),
 
                               const SizedBox(height: 24),
 
@@ -918,5 +920,36 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         ],
       ),
     );
+  }
+
+  Future<int> _getBookingCount() async {
+    try {
+      final phone = await _apiService.getUserPhone();
+      if (phone != null) {
+        final bookings = await _bookingService.getCustomerBookings(phone);
+        return bookings.length;
+      }
+    } catch (e) {
+      // Ignore
+    }
+    return 0;
+  }
+
+  Future<List<Map<String, dynamic>>> _getRecentBookings() async {
+    try {
+      final phone = await _apiService.getUserPhone();
+      if (phone != null) {
+        final bookings = await _bookingService.getCustomerBookings(phone);
+        return bookings.take(3).toList();
+      }
+    } catch (e) {
+      // Ignore
+    }
+    return [];
+  }
+
+  Future<int> _getMembershipCount() async {
+    // TODO: Implement with API
+    return 0;
   }
 }

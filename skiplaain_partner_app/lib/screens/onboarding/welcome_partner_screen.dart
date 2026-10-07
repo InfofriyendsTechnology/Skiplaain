@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../utils/transitions.dart';
-import '../../widgets/mapbox_location_picker.dart';
 import 'manage_services_screen.dart';
 
 class WelcomePartnerScreen extends StatefulWidget {
@@ -14,7 +13,6 @@ class WelcomePartnerScreen extends StatefulWidget {
 
 class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
   String _selectedCategory = 'Gents Salon';
 
   final List<String> _categories = [
@@ -25,10 +23,10 @@ class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
   ];
 
   void _onGetStarted() {
-    if (_nameController.text.trim().isEmpty || _locationController.text.trim().isEmpty) {
+    if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill all details'),
+          content: Text('Please enter business name'),
           backgroundColor: Colors.red,
         ),
       );
@@ -41,7 +39,7 @@ class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
       PremiumTransition(
         page: ManageServicesScreen(
           salonName: _nameController.text.trim(),
-          address: _locationController.text.trim(),
+          address: 'Address not set', // Will be added from profile later
           category: _selectedCategory,
           phoneNumber: widget.phoneNumber ?? '+91 85535 35342',
         ),
@@ -52,7 +50,6 @@ class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _locationController.dispose();
     super.dispose();
   }
 
@@ -218,46 +215,6 @@ class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
                         hint: 'e.g. Yash Styles',
                       ),
                       
-                      _buildInputField(
-                        label: 'LOCATION',
-                        controller: _locationController,
-                        hint: 'Search and select location on map',
-                        readOnly: true,
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => MapboxLocationPicker(
-                                onLocationSelected: (location) {},
-                              ),
-                            ),
-                          );
-                          if (result != null && result is Map<String, dynamic>) {
-                            setState(() {
-                              _locationController.text = result['address'] ?? 'Location Selected';
-                            });
-                          }
-                        },
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.location_on, color: Color(0xFF00FF00)),
-                          onPressed: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => MapboxLocationPicker(
-                                  onLocationSelected: (location) {},
-                                ),
-                              ),
-                            );
-                            if (result != null && result is Map<String, dynamic>) {
-                              setState(() {
-                                _locationController.text = result['address'] ?? 'Location Selected';
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      
                       _buildDropdownField(
                         label: 'SALON CATEGORY',
                         value: _selectedCategory,
@@ -269,6 +226,29 @@ class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
                             });
                           }
                         },
+                      ),
+                      
+                      const SizedBox(height: 24),
+                      
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1A1A),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Color(0xFF00FF00).withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Color(0xFF00FF00), size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'You can add your address later from Profile Settings',
+                                style: TextStyle(color: Colors.white70, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -287,7 +267,7 @@ class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
                       backgroundColor: const Color(0xFF00FF00),
                       foregroundColor: Colors.black,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4), // slightly squared as per design
+                        borderRadius: BorderRadius.circular(4),
                       ),
                       elevation: 0,
                     ),

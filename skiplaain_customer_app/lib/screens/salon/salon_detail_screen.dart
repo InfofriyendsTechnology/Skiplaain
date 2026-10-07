@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
-import '../../services/booking_service.dart';
+import '../../services/api_service.dart';
+import '../../services/api_booking_service.dart';
+import '../../services/api_auth_service.dart';
+import '../../utils/popup_utils.dart';
 import '../booking/booking_confirmation_screen.dart';
 
 class SalonDetailScreen extends StatefulWidget {
@@ -13,8 +15,9 @@ class SalonDetailScreen extends StatefulWidget {
 }
 
 class _SalonDetailScreenState extends State<SalonDetailScreen> {
-  final CustomerAuthService _authService = CustomerAuthService();
-  final BookingService _bookingService = BookingService();
+  final ApiService _apiService = ApiService();
+  final ApiBookingService _bookingService = ApiBookingService();
+  final ApiAuthService _authService = ApiAuthService();
   final Set<int> _selectedIndices = {};
 
   int _selectedPlanIndex = 2; // 0 = 3M (₹33), 1 = 6M (₹66), 2 = 12M (₹99)
@@ -69,28 +72,18 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     setState(() => _isProcessingMembership = true);
 
     try {
-      final membershipData = await _bookingService.saveShopMembership(
-        salonId: _salonId,
-        salonName: _salonName,
-        customerPhone: _authService.customerPhone,
-        customerName: _authService.customerName,
-        planName: plan['name'] as String,
-        price: plan['price'] as int,
-        durationMonths: plan['duration'] as int,
-      );
-
-      _authService.activateSalonMembership(
+      // Call API to activate membership
+      await _authService.activateSalonMembership(
         _salonId,
         plan['name'] as String,
-        plan['price'] as int,
         plan['duration'] as int,
       );
 
       if (!mounted) return;
       setState(() => _isProcessingMembership = false);
 
-      // Show proper celebration confirmation dialog
-      _showMembershipSuccessDialog(membershipData);
+      // Show success dialog
+      _showMembershipSuccessDialog({'planName': plan['name'], 'duration': plan['duration']});
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessingMembership = false);
@@ -279,8 +272,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
-          child: StreamBuilder<Map<String, dynamic>?>(
-            stream: _bookingService.streamSalonMembership(_salonId, _authService.customerPhone),
+          child: FutureBuilder<Map<String, dynamic>?>(
+            future: Future.value(null), // TODO: Fetch membership status from API
             builder: (context, membershipSnapshot) {
               final activeMembership = membershipSnapshot.data;
               final isVip = activeMembership != null && (activeMembership['status'] == 'active');

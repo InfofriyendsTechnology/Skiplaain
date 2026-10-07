@@ -246,6 +246,7 @@ class _SlotPickerScreenState extends State<SlotPickerScreen> {
                             barbers: barbers,
                             selectedWeekday: selectedWeekday,
                             selectedWeekdayFull: selectedWeekdayFull,
+                            selectedDateIso: selectedDateIso,
                             isSalonWeeklyOff: isSalonWeeklyOff,
                             availableCount: availableBarbersCount,
                           ),
@@ -523,6 +524,7 @@ class _SlotPickerScreenState extends State<SlotPickerScreen> {
     required List<Map<String, dynamic>> barbers,
     required String selectedWeekday,
     required String selectedWeekdayFull,
+    required String selectedDateIso,
     required bool isSalonWeeklyOff,
     required int availableCount,
   }) {

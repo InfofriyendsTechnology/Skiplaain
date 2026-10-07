@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../services/auth_service.dart';
-import '../../services/booking_service.dart';
+import '../../services/api_service.dart';
+import '../../services/api_booking_service.dart';
 import '../../widgets/status_badge.dart';
 import '../../utils/popup_utils.dart';
 import 'booking_detail_screen.dart';
@@ -14,8 +14,37 @@ class MyBookingsScreen extends StatefulWidget {
 }
 
 class _MyBookingsScreenState extends State<MyBookingsScreen> {
-  final BookingService _bookingService = BookingService();
-  final CustomerAuthService _authService = CustomerAuthService();
+  final ApiBookingService _bookingService = ApiBookingService();
+  final ApiService _apiService = ApiService();
+  List<Map<String, dynamic>> _bookings = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBookings();
+  }
+
+  Future<void> _loadBookings() async {
+    setState(() => _isLoading = true);
+    try {
+      final phone = await _apiService.getUserPhone();
+      if (phone != null) {
+        final bookings = await _bookingService.getCustomerBookings(phone);
+        setState(() {
+          _bookings = bookings;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        PopupUtils.showErrorNotification(context, 'Failed to load bookings');
+      }
+    }
+  }
 
   void _onCancelBooking(String bookingId) async {
     HapticFeedback.mediumImpact();
@@ -31,11 +60,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
     if (confirmed) {
       try {
-        await _bookingService.cancelBooking(
-          bookingId,
-          cancelledBy: 'customer',
-          reason: 'Cancelled by customer',
+        await _bookingService.updateBookingStatus(
+          bookingId: bookingId,
+          status: 'cancelled',
         );
+        _loadBookings();
         if (mounted) {
           HapticFeedback.lightImpact();
           PopupUtils.showSuccessNotification(
@@ -81,74 +110,65 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
-          child: StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _bookingService.streamCustomerBookings(_authService.customerPhone),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
+          child: _isLoading
+              ? const Center(
                   child: CircularProgressIndicator(color: Color(0xFF00FF00)),
-                );
-              }
-
-              final bookings = snapshot.data ?? [];
-
-              if (bookings.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF141414),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF262626)),
-                          ),
-                          child: const Icon(Icons.calendar_today_outlined, color: Color(0xFF00FF00), size: 26),
+                )
+              : _bookings.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF141414),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFF262626)),
+                              ),
+                              child: const Icon(Icons.calendar_today_outlined, color: Color(0xFF00FF00), size: 26),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No Appointments Yet',
+                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Your confirmed salon appointments will appear here.',
+                              style: TextStyle(color: Colors.white38, fontSize: 13),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No Appointments Yet',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Your confirmed salon appointments will appear here.',
-                          style: TextStyle(color: Colors.white38, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _bookings.length,
+                      itemBuilder: (context, index) {
+                        final b = _bookings[index];
+                        final bookingId = (b['id'] ?? '').toString();
+                        final salonName = (b['partner']?['salonName'] ?? 'Salon').toString();
+                        final salonAddress = (b['partner']?['address'] ?? '').toString();
+                        final bookingDate = (b['bookingDate'] ?? '').toString();
+                        final timeSlot = (b['timeSlot'] ?? '').toString();
+                        final status = (b['status'] ?? 'confirmed').toString().toLowerCase();
+                        final totalAmount = (b['totalAmount'] ?? 0);
+                        final services = (b['bookingServices'] as List<dynamic>?) ?? [];
+                        final serviceSummary = services.map((s) => s['service']?['name'] ?? '').join(', ');
 
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: bookings.length,
-                itemBuilder: (context, index) {
-                  final b = bookings[index];
-                  final bookingId = (b['bookingId'] ?? b['id'] ?? '').toString();
-                  final salonName = (b['salonName'] ?? 'Salon').toString();
-                  final salonAddress = (b['salonAddress'] ?? '').toString();
-                  final bookingDate = (b['bookingDate'] ?? '').toString();
-                  final timeSlot = (b['timeSlot'] ?? b['time'] ?? '').toString();
-                  final status = (b['status'] ?? 'confirmed').toString().toLowerCase();
-                  final price = (b['price'] ?? '₹${b['totalAmount'] ?? 0}').toString();
-                  final services = (b['services'] as List<dynamic>?) ?? [];
-                  final serviceSummary = (b['service'] ?? services.map((s) => s['name']).join(', ')).toString();
+                        final isConfirmed = status == 'confirmed';
+                        final isCompleted = status == 'completed';
 
-                  final isConfirmed = status == 'confirmed';
-                  final isCompleted = status == 'completed';
-
-                  Color badgeColor = const Color(0xFF00FF00);
-                  if (status == 'cancelled') {
-                    badgeColor = const Color(0xFFEF4444);
-                  } else if (isCompleted) {
-                    badgeColor = const Color(0xFF38BDF8);
-                  }
+                        Color badgeColor = const Color(0xFF00FF00);
+                        if (status == 'cancelled') {
+                          badgeColor = const Color(0xFFEF4444);
+                        } else if (isCompleted) {
+                          badgeColor = const Color(0xFF38BDF8);
+                        }
 
                   return GestureDetector(
                     onTap: () {
@@ -228,7 +248,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                               ),
                               const Spacer(),
                               Text(
-                                price,
+                                '₹$totalAmount',
                                 style: const TextStyle(
                                   color: Color(0xFF00FF00),
                                   fontSize: 16,
@@ -260,10 +280,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                       ),
                     ),
                   );
-                },
-              );
-            },
-          ),
+                      },
+                    ),
         ),
       ),
     );

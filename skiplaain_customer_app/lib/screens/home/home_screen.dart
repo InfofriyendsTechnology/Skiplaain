@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../services/salon_service.dart';
-import '../../services/auth_service.dart';
-import '../../services/booking_service.dart';
+import '../../services/api_salon_service.dart';
+import '../../services/api_service.dart';
+import '../../services/api_booking_service.dart';
+import '../../services/api_auth_service.dart';
 import '../../utils/popup_utils.dart';
 import '../auth/customer_onboarding_screen.dart';
 import '../booking/booking_confirmation_screen.dart';
@@ -16,9 +17,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
-  final SalonService _salonService = SalonService();
-  final CustomerAuthService _authService = CustomerAuthService();
-  final BookingService _bookingService = BookingService();
+  final ApiSalonService _salonService = ApiSalonService();
+  final ApiService _apiService = ApiService();
+  final ApiBookingService _bookingService = ApiBookingService();
+  final ApiAuthService _authService = ApiAuthService();
 
   final TextEditingController _searchController = TextEditingController();
 
@@ -33,6 +35,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   final Set<int> _selectedServiceIndices = {};
   int _selectedPlanIndex = 2; // 0 = 3M (₹33), 1 = 6M (₹66), 2 = 12M (₹99)
   bool _isProcessingMembership = false;
+  
+  List<Map<String, dynamic>> _salons = [];
+  bool _isLoadingSalons = true;
 
   final List<Map<String, dynamic>> _plans = [
     {'name': '3 Months VIP', 'duration': 3, 'price': 33, 'perMonth': '₹11/mo', 'badge': 'STARTER'},
@@ -66,12 +71,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
 
     _checkSession();
+    _loadSalons();
   }
 
   void _checkSession() async {
-    if (!_authService.isInitialized) {
-      await _authService.initSession();
-      if (mounted) setState(() {});
+    final token = await _apiService.getToken();
+    await _authService.initSession();
+    if (mounted) setState(() {});
+  }
+  
+  Future<void> _loadSalons() async {
+    setState(() => _isLoadingSalons = true);
+    try {
+      final salons = await _salonService.getAllSalons();
+      setState(() {
+        _salons = salons;
+        _isLoadingSalons = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingSalons = false);
     }
   }
 
@@ -82,12 +100,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  void _onSalonSelected(Map<String, dynamic> salon) {
+  void _onSalonSelected(Map<String, dynamic> salon) async {
     if (_authService.isLoggedIn && _authService.customerName.isNotEmpty) {
-      setState(() {
-        _authService.connectSalon(salon);
-        _selectedServiceIndices.clear();
-      });
+      await _authService.connectSalon(salon);
+      if (mounted) {
+        setState(() {
+          _selectedServiceIndices.clear();
+        });
+      }
     } else {
       // Open dedicated 3-step onboarding: Phone -> OTP -> Name -> Salon Hub
       Navigator.of(context).push(
@@ -238,12 +258,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             trailing: isCurrent
                                 ? const Icon(Icons.check_circle_rounded, color: Color(0xFF00FF00), size: 20)
                                 : const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF666666), size: 16),
-                            onTap: () {
-                              _authService.switchActiveSalon(s);
-                              Navigator.of(context).pop();
-                              setState(() {
-                                _selectedServiceIndices.clear();
-                              });
+                            onTap: () async {
+                              await _authService.switchActiveSalon(s);
+                              if (mounted) {
+                                Navigator.of(context).pop();
+                                setState(() {
+                                  _selectedServiceIndices.clear();
+                                });
+                              }
                             },
                           ),
                         );
@@ -469,10 +491,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
-          child: StreamBuilder<Map<String, dynamic>?>(
-            stream: _bookingService.streamSalonMembership(salonId, _authService.customerPhone),
-            builder: (context, membershipSnapshot) {
-              final activeMembership = membershipSnapshot.data;
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Builder(
+              builder: (context) {
+                // TODO: Fetch membership from API
+                final activeMembership = null;
               final isVip = activeMembership != null && (activeMembership['status'] == 'active');
 
               return Column(
@@ -765,7 +789,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                 ],
               );
-            },
+              },
+            ),
           ),
         ),
       ),
@@ -995,128 +1020,165 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     setState(() => _isProcessingMembership = true);
 
     try {
-      final membershipData = await _bookingService.saveShopMembership(
-        salonId: salonId,
-        salonName: salonName,
-        customerPhone: _authService.customerPhone,
-        customerName: _authService.customerName,
-        planName: plan['name'] as String,
-        price: plan['price'] as int,
-        durationMonths: plan['duration'] as int,
-      );
+      // TODO: Create membership via API
+      await Future.delayed(const Duration(seconds: 1));
+      await _authService.activateSalonMembership(salonId, plan['name'] as String, plan['duration'] as int);
 
-      _authService.activateSalonMembership(
-        salonId,
-        plan['name'] as String,
-        plan['price'] as int,
-        plan['duration'] as int,
-      );
-
-      if (!mounted) return;
       setState(() => _isProcessingMembership = false);
 
-      _showMembershipSuccessDialog(salonName, membershipData);
+      if (!mounted) return;
+
+      // Show success dialog
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: const Color(0xFF141414),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: Color(0xFF00FF00), width: 1.2),
+          ),
+          contentPadding: const EdgeInsets.all(24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00FF00).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_circle_outline, color: Color(0xFF00FF00), size: 32),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '${plan['name']} Activated!',
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You now have VIP access at $salonName',
+                style: const TextStyle(color: Colors.white60, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF00),
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Awesome!'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessingMembership = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to activate VIP pass: $e')),
-        );
+        PopupUtils.showErrorNotification(context, 'Failed to activate VIP: $e');
       }
     }
   }
 
-  void _showMembershipSuccessDialog(String salonName, Map<String, dynamic> data) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141414),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: Color(0xFF00FF00), width: 1.2),
-        ),
-        contentPadding: const EdgeInsets.all(24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: const Color(0xFF00FF00).withOpacity(0.15),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF00FF00), width: 2),
-              ),
-              child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF00FF00), size: 34),
+  // This dialog is now shown inline in _buyMembership method above
+  Widget _buildMembershipSuccessDialog({
+    required String salonName,
+    required Map<String, dynamic> data,
+  }) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF141414),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: const BorderSide(color: Color(0xFF00FF00), width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.all(24),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFF00FF00).withOpacity(0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF00FF00), width: 2),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'VIP Pass Activated!',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+            child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF00FF00), size: 34),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'VIP Pass Activated!',
+            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'You are now an active VIP member of $salonName',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF262626)),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'You are now an active VIP member of $salonName',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-            const SizedBox(height: 20),
-
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF262626)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Plan', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                      Text(data['planName'] ?? 'VIP Pass', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Valid Until', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                      Text(data['expiryDisplay'] ?? 'Active', style: const TextStyle(color: Color(0xFF00FF00), fontSize: 12, fontWeight: FontWeight.w800)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Line Skip Priority', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                      Text('UNLOCKED', style: TextStyle(color: Color(0xFF00FF00), fontSize: 12, fontWeight: FontWeight.w900)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00FF00),
-                  foregroundColor: Colors.black,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Plan', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    Text(data['planName'] ?? 'VIP Pass', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ],
                 ),
-                child: const Text('Start Using VIP Pass'),
-              ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Valid Until', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    Text(data['expiryDisplay'] ?? 'Active', style: const TextStyle(color: Color(0xFF00FF00), fontSize: 12, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Line Skip Priority', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    Text('UNLOCKED', style: TextStyle(color: Color(0xFF00FF00), fontSize: 12, fontWeight: FontWeight.w900)),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF00),
+                foregroundColor: Colors.black,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              ),
+              child: const Text('Start Using VIP Pass'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1145,10 +1207,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _salonService.streamSalons(),
-              builder: (context, snapshot) {
-                final salons = snapshot.data ?? [];
+            child: _isLoadingSalons
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF00FF00)))
+                : Builder(
+                    builder: (context) {
+                      final salons = _salons;
 
                 return Column(
                   children: [
