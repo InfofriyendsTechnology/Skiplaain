@@ -3,9 +3,20 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
-  // For Android Emulator: use 10.0.2.2 instead of localhost
-  // For iOS Simulator/Physical Device: use your machine's IP address (e.g., http://192.168.x.x:61026/api)
-  static const String baseUrl = 'http://10.0.2.2:61026/api';
+  // NETWORK CONFIGURATION
+  // 🔧 IMPORTANT: Choose the correct URL based on your device:
+  // 
+  // Option 1: Android Emulator (AVD)
+  // static const String baseUrl = 'http://10.0.2.2:61026/api';
+  // 
+  // Option 2: Physical Device / iOS Simulator (use your PC's IP)
+  // static const String baseUrl = 'http://192.168.0.103:61026/api';
+  // 
+  // Option 3: Local web testing
+  // static const String baseUrl = 'http://localhost:61026/api';
+  
+  // CURRENT CONFIGURATION (Physical Device / Real Network)
+  static const String baseUrl = 'http://192.168.0.103:61026/api';
   
   final _storage = const FlutterSecureStorage();
   

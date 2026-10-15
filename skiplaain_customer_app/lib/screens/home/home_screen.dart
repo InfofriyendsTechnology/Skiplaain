@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../services/api_salon_service.dart';
 import '../../services/api_service.dart';
 import '../../services/api_booking_service.dart';
@@ -23,11 +24,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   final ApiAuthService _authService = ApiAuthService();
 
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   int _activeTab = 0; // 0 = QR Scan, 1 = Search Shop
   String _searchQuery = '';
   String _selectedCity = 'Surat';
   bool _isFlashOn = false;
+  bool _isSearching = false;
 
   late AnimationController _animController;
   late Animation<double> _scanLineAnim;
@@ -37,7 +40,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _isProcessingMembership = false;
   
   List<Map<String, dynamic>> _salons = [];
+  List<Map<String, dynamic>> _filteredSalons = [];
   bool _isLoadingSalons = true;
+  List<String> _searchHistory = [];
 
   final List<Map<String, dynamic>> _plans = [
     {'name': '3 Months VIP', 'duration': 3, 'price': 33, 'perMonth': '₹11/mo', 'badge': 'STARTER'},
@@ -81,22 +86,96 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
   
   Future<void> _loadSalons() async {
+    if (!mounted) return;
+    
     setState(() => _isLoadingSalons = true);
+    
     try {
       final salons = await _salonService.getAllSalons();
-      setState(() {
-        _salons = salons;
-        _isLoadingSalons = false;
-      });
+      if (mounted) {
+        setState(() {
+          _salons = salons;
+          _filteredSalons = salons;
+          _isLoadingSalons = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoadingSalons = false);
+      if (mounted) {
+        setState(() => _isLoadingSalons = false);
+      }
     }
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+
+    if (query.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _searchQuery = '';
+          _filteredSalons = _salons;
+          _isSearching = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isSearching = true);
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
+      if (!mounted) return;
+      
+      try {
+        final results = await _salonService.searchSalons(query.trim(), city: _selectedCity);
+        
+        if (mounted) {
+          setState(() {
+            _searchQuery = query.trim().toLowerCase();
+            _filteredSalons = results;
+            _isSearching = false;
+            
+            if (query.trim().length > 2 && !_searchHistory.contains(query.trim())) {
+              _searchHistory.insert(0, query.trim());
+              if (_searchHistory.length > 5) _searchHistory.removeLast();
+            }
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _filteredSalons = _salons;
+            _isSearching = false;
+          });
+        }
+      }
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    
+    if (mounted) {
+      setState(() {
+        _searchQuery = '';
+        _filteredSalons = _salons;
+        _isSearching = false;
+      });
+    }
+  }
+
+  void _applySearchHistory(String query) {
+    _searchController.text = query;
+    _onSearchChanged(query);
   }
 
   @override
   void dispose() {
     _animController.dispose();
     _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -844,7 +923,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: Padding(
                   padding: EdgeInsets.only(right: index < 2 ? 8 : 0),
                   child: InkWell(
-                    onTap: () => setState(() => _selectedPlanIndex = index),
+                    onTap: () {
+                      if (mounted) {
+                        setState(() => _selectedPlanIndex = index);
+                      }
+                    },
                     borderRadius: BorderRadius.circular(14),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
@@ -1016,15 +1099,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   void _buyMembership(String salonId, String salonName) async {
+    if (!mounted) return;
+    
     final plan = _plans[_selectedPlanIndex];
     setState(() => _isProcessingMembership = true);
 
     try {
-      // TODO: Create membership via API
       await Future.delayed(const Duration(seconds: 1));
       await _authService.activateSalonMembership(salonId, plan['name'] as String, plan['duration'] as int);
 
-      setState(() => _isProcessingMembership = false);
+      if (mounted) {
+        setState(() => _isProcessingMembership = false);
+      }
 
       if (!mounted) return;
 
@@ -1388,7 +1474,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
                 InkWell(
                   onTap: () {
-                    setState(() => _selectedCity = 'Surat');
+                    if (mounted) {
+                      setState(() => _selectedCity = 'Surat');
+                    }
                     Navigator.of(modalContext).pop();
                   },
                   borderRadius: BorderRadius.circular(12),
@@ -1452,7 +1540,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               ? const Icon(Icons.check_rounded, color: Color(0xFF00FF00), size: 20)
                               : null,
                           onTap: () {
-                            setState(() => _selectedCity = city);
+                            if (mounted) {
+                              setState(() => _selectedCity = city);
+                            }
                             Navigator.of(modalContext).pop();
                           },
                         ),
@@ -1472,7 +1562,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final isSelected = _activeTab == index;
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _activeTab = index),
+        onTap: () {
+          if (mounted) {
+            setState(() => _activeTab = index);
+          }
+        },
         borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -1612,7 +1706,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             InkWell(
-              onTap: () => setState(() => _isFlashOn = !_isFlashOn),
+              onTap: () {
+                if (mounted) {
+                  setState(() => _isFlashOn = !_isFlashOn);
+                }
+              },
               borderRadius: BorderRadius.circular(14),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1669,130 +1767,439 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildSearchTab(List<Map<String, dynamic>> salons) {
-    final filtered = salons.where((s) {
-      if (_searchQuery.isEmpty) return false;
-      final name = (s['salonName'] ?? s['businessName'] ?? '').toString().toLowerCase();
-      final addr = (s['address'] ?? s['location'] ?? '').toString().toLowerCase();
-      return name.contains(_searchQuery) || addr.contains(_searchQuery);
-    }).toList();
-
     return Column(
       children: [
         const SizedBox(height: 6),
-        TextField(
-          controller: _searchController,
-          onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          decoration: InputDecoration(
-            hintText: 'Search in $_selectedCity...',
-            hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-            prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54, size: 20),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear_rounded, color: Colors.white54, size: 18),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _searchQuery = '');
-                    },
-                  )
+        // Search Input with Professional Design
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF141414),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _searchQuery.isNotEmpty ? const Color(0xFF00FF00).withOpacity(0.3) : const Color(0xFF262626),
+            ),
+            boxShadow: _searchQuery.isNotEmpty
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF00FF00).withOpacity(0.1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    )
+                  ]
                 : null,
-            filled: true,
-            fillColor: const Color(0xFF141414),
-            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFF262626)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFF262626)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFF00FF00), width: 1.5),
+          ),
+          child: TextField(
+            controller: _searchController,
+            onChanged: _onSearchChanged,
+            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+            decoration: InputDecoration(
+              hintText: 'Search salons in $_selectedCity...',
+              hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+              prefixIcon: _isSearching
+                  ? const Padding(
+                      padding: EdgeInsets.all(14),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00FF00)),
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.search_rounded, color: Colors.white54, size: 20),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20),
+                      onPressed: _clearSearch,
+                    )
+                  : null,
+              filled: false,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
             ),
           ),
         ),
-        const SizedBox(height: 18),
 
-        if (_searchQuery.isEmpty)
+        // Search Results Counter
+        if (_searchQuery.isNotEmpty && !_isSearching)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            child: Row(
+              children: [
+                Text(
+                  '${_filteredSalons.length} salon${_filteredSalons.length != 1 ? 's' : ''} found',
+                  style: const TextStyle(
+                    color: Color(0xFF00FF00),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                if (_searchQuery.isNotEmpty)
+                  Text(
+                    'in $_selectedCity',
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 11,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: 4),
+
+        // Search History (when no search query)
+        if (_searchQuery.isEmpty && _searchHistory.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F0F0F),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF1A1A1A)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.history_rounded, color: Colors.white38, size: 16),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Recent Searches',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () {
+                        if (mounted) {
+                          setState(() => _searchHistory.clear());
+                        }
+                      },
+                      child: const Text(
+                        'Clear',
+                        style: TextStyle(
+                          color: Color(0xFF00FF00),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _searchHistory.map((query) {
+                    return InkWell(
+                      onTap: () => _applySearchHistory(query),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1A1A),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFF262626)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.search, color: Colors.white38, size: 12),
+                            const SizedBox(width: 6),
+                            Text(
+                              query,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+
+        // Empty State
+        if (_searchQuery.isEmpty && _searchHistory.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 60),
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: const Color(0xFF141414),
                     shape: BoxShape.circle,
                     border: Border.all(color: const Color(0xFF262626)),
                   ),
-                  child: const Icon(Icons.storefront_outlined, color: Colors.white38, size: 28),
+                  child: const Icon(Icons.storefront_outlined, color: Colors.white38, size: 32),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Text(
-                  'Search Salons in $_selectedCity',
-                  style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w700),
+                  'Discover Salons in $_selectedCity',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 const Text(
-                  'Type your salon or barber shop name above',
-                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                  'Search by name, location, or category',
+                  style: TextStyle(color: Colors.white38, fontSize: 13),
                 ),
               ],
             ),
-          )
-        else if (filtered.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 40),
-            child: Text(
-              'No salons found in $_selectedCity matching your search.',
-              style: const TextStyle(color: Colors.white54, fontSize: 13),
-            ),
-          )
-        else
-          ...filtered.map((salon) {
-            final name = (salon['salonName'] ?? salon['businessName'] ?? 'Salon').toString();
-            final addr = (salon['address'] ?? salon['location'] ?? _selectedCity).toString();
-            final category = (salon['category'] ?? 'Unisex').toString();
+          ),
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF141414),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFF242424)),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                leading: Container(
-                  width: 44,
-                  height: 44,
+        // No Results State
+        if (_searchQuery.isNotEmpty && _filteredSalons.isEmpty && !_isSearching)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 60),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00FF00).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.2)),
+                    color: const Color(0xFF1A1A1A),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF262626)),
                   ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : 'S',
-                    style: const TextStyle(color: Color(0xFF00FF00), fontWeight: FontWeight.w900, fontSize: 18),
+                  child: const Icon(Icons.search_off_rounded, color: Colors.white38, size: 32),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No Salons Found',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'No matches for "$_searchQuery" in $_selectedCity',
+                  style: const TextStyle(color: Colors.white38, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                TextButton.icon(
+                  onPressed: _clearSearch,
+                  icon: const Icon(Icons.refresh_rounded, size: 18, color: Color(0xFF00FF00)),
+                  label: const Text(
+                    'Clear Search',
+                    style: TextStyle(color: Color(0xFF00FF00), fontWeight: FontWeight.w600),
                   ),
                 ),
-                title: Text(
-                  name,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text('$category • $addr', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF00FF00), size: 14),
-                onTap: () => _onSalonSelected(salon),
-              ),
-            );
-          }),
+              ],
+            ),
+          ),
+
+        // Search Results with Animated Entry
+        if (_searchQuery.isNotEmpty && _filteredSalons.isNotEmpty && !_isSearching)
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.only(bottom: 20),
+              itemCount: _filteredSalons.length,
+              itemBuilder: (context, index) {
+                final salon = _filteredSalons[index];
+                return _buildSalonCard(salon, index);
+              },
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _buildSalonCard(Map<String, dynamic> salon, int index) {
+    final name = (salon['salonName'] ?? salon['businessName'] ?? 'Salon').toString();
+    final address = (salon['address'] ?? salon['location'] ?? _selectedCity).toString();
+    final category = (salon['category'] ?? 'Unisex').toString();
+    final rating = (salon['rating'] ?? 4.5).toString();
+    
+    // Highlight search match
+    final nameMatch = name.toLowerCase().contains(_searchQuery);
+
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 300 + (index * 50)),
+      tween: Tween(begin: 0.0, end: 1.0),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(0, 20 * (1 - value)),
+          child: Opacity(
+            opacity: value,
+            child: child,
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141414),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: nameMatch ? const Color(0xFF00FF00).withOpacity(0.3) : const Color(0xFF242424),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _onSalonSelected(salon),
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  // Salon Avatar
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF00FF00).withOpacity(0.2),
+                          const Color(0xFF00FF00).withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3)),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : 'S',
+                      style: const TextStyle(
+                        color: Color(0xFF00FF00),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+
+                  // Salon Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (nameMatch)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF00FF00).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'MATCH',
+                                  style: TextStyle(
+                                    color: Color(0xFF00FF00),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A1A1A),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                category,
+                                style: const TextStyle(
+                                  color: Color(0xFF00FF00),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.star_rounded, color: Color(0xFFFFD700), size: 12),
+                            const SizedBox(width: 2),
+                            Text(
+                              rating,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_outlined, color: Colors.white38, size: 12),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                address,
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Arrow Icon
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00FF00).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Color(0xFF00FF00),
+                      size: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

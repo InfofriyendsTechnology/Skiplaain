@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/partner_service.dart';
+import '../../services/api_partner_service.dart';
 import '../dashboard/main_dashboard_screen.dart';
 
 class AddBarbersScreen extends StatefulWidget {
@@ -29,7 +29,7 @@ class AddBarbersScreen extends StatefulWidget {
 }
 
 class _AddBarbersScreenState extends State<AddBarbersScreen> {
-  final PartnerService _partnerService = PartnerService();
+  final ApiPartnerService _apiService = ApiPartnerService();
   bool _isLoading = false;
 
   static const List<String> _allWeekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -176,25 +176,68 @@ class _AddBarbersScreenState extends State<AddBarbersScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _partnerService.savePartnerProfile(
-        phoneNumber: widget.phoneNumber,
+      // First check if partner already exists
+      final partnerId = _apiService.partnerId;
+      
+      if (partnerId.isNotEmpty) {
+        // Partner already registered - just update profile and go to dashboard
+        if (!mounted) return;
+        
+        await _apiService.savePartnerSession(
+          phoneNumber: widget.phoneNumber,
+          partnerId: partnerId,
+        );
+        
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const MainDashboardScreen()),
+          (route) => false,
+        );
+        return;
+      }
+
+      // New registration - create partner profile
+      final result = await _apiService.registerPartner(
+        phone: widget.phoneNumber,
+        ownerName: 'Partner Owner',
         salonName: widget.salonName,
         address: widget.address,
-        category: widget.category,
-        openingTime: widget.openingTime,
-        closingTime: widget.closingTime,
-        weeklyOff: widget.weeklyOff,
-        services: widget.services,
         barbers: _barbers,
+        services: widget.services,
       );
 
       if (!mounted) return;
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const MainDashboardScreen()),
-        (route) => false,
-      );
+      if (result['success'] == true) {
+        // Save session with partner ID from response
+        final newPartnerId = result['data']?['id'];
+        if (newPartnerId != null) {
+          await _apiService.savePartnerSession(
+            phoneNumber: widget.phoneNumber,
+            partnerId: newPartnerId,
+          );
+        }
+        
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const MainDashboardScreen()),
+          (route) => false,
+        );
+      } else {
+        // Check if it's a "already exists" error - treat as login
+        final errorMsg = result['message'] ?? '';
+        if (errorMsg.toLowerCase().contains('already exists') || 
+            errorMsg.toLowerCase().contains('duplicate')) {
+          // Partner exists - just log them in
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const MainDashboardScreen()),
+            (route) => false,
+          );
+        } else {
+          throw Exception(errorMsg.isNotEmpty ? errorMsg : 'Registration failed');
+        }
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);

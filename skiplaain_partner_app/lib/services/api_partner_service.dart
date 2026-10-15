@@ -25,6 +25,14 @@ class ApiPartnerService {
   bool get isApproved => _status == 'approved';
   bool get isLoggedIn => _partnerId != null && _partnerId!.isNotEmpty;
 
+  /// Check if phone number exists (Google-grade auth flow)
+  Future<Map<String, dynamic>> checkPhone(String phone) async {
+    final result = await _api.post('/partners/check-phone', {
+      'phone': phone,
+    });
+    return result;
+  }
+
   /// Initialize session
   Future<void> initSession() async {
     try {
@@ -104,6 +112,21 @@ class ApiPartnerService {
       'services': services ?? [],
     });
 
+    // Auto-save session if successful (Google-grade UX)
+    if (result['success'] == true && result['data'] != null) {
+      final data = result['data'] as Map<String, dynamic>;
+      final newPartnerId = data['id'];
+      final newSalonName = data['salonName'] ?? salonName;
+      final newStatus = data['status'] ?? 'pending';
+      
+      _partnerId = newPartnerId;
+      _partnerPhone = phone;
+      _salonName = newSalonName;
+      _status = newStatus;
+      
+      await _persistSession();
+    }
+
     return result;
   }
 
@@ -179,6 +202,16 @@ class ApiPartnerService {
       await prefs.setString('partner_status', _status);
     } catch (_) {}
   }
+  
+  /// Public method to save session (used after registration)
+  Future<void> savePartnerSession({
+    required String phoneNumber,
+    required String partnerId,
+  }) async {
+    _partnerPhone = phoneNumber;
+    _partnerId = partnerId;
+    await _persistSession();
+  }
 
   /// Logout
   Future<void> logout() async {
@@ -195,4 +228,23 @@ class ApiPartnerService {
 
   // Getter for currentPartnerId (used in other services)
   String? get currentPartnerId => _partnerId;
+
+  /// Get partner profile
+  Future<Map<String, dynamic>> getPartnerProfile() async {
+    if (_partnerId == null || _partnerId!.isEmpty) {
+      throw Exception('Partner not logged in');
+    }
+
+    final result = await _api.get('/partners/$_partnerId');
+
+    if (result['success'] == true && result['data'] != null) {
+      final data = result['data'] as Map<String, dynamic>;
+      _salonName = data['salonName'] ?? _salonName;
+      _status = data['status'] ?? _status;
+      await _persistSession();
+      return data;
+    }
+
+    throw Exception('Failed to fetch partner data');
+  }
 }

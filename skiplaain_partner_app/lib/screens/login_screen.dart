@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
-import '../services/api_partner_service.dart'; // NEW: API-based service
+import '../services/api_partner_service.dart';
 import '../utils/popup_utils.dart';
 import '../utils/transitions.dart';
 import 'otp_screen.dart';
@@ -14,7 +14,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
-  final ApiPartnerService _authService = ApiPartnerService(); // NEW: Using API service
+  final ApiPartnerService _authService = ApiPartnerService();
   String _completePhoneNumber = "";
   bool _isLoading = false;
 
@@ -22,6 +22,69 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleSubmit() async {
+    String rawNumber = _phoneController.text.trim().replaceAll(' ', '');
+    
+    if (rawNumber.length != 10) {
+      PopupUtils.showErrorNotification(
+        context,
+        'Please enter a valid 10-digit number',
+      );
+      return;
+    }
+    
+    String finalNumber = "+91$rawNumber";
+    
+    setState(() => _isLoading = true);
+
+    try {
+      // Check if partner exists (Google-grade flow)
+      final checkResult = await _authService.checkPhone(finalNumber);
+      
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      
+      final exists = checkResult['data']?['exists'] ?? false;
+      final partner = checkResult['data']?['partner'];
+      
+      if (exists && partner != null) {
+        // Existing partner - show welcome back message
+        PopupUtils.showSuccessNotification(
+          context,
+          'Welcome back, ${partner['salonName']}!',
+        );
+      } else {
+        // New partner
+        PopupUtils.showSuccessNotification(
+          context,
+          'New user - Use OTP: 111111',
+        );
+      }
+      
+      // Navigate to OTP screen with user status
+      Navigator.push(
+        context,
+        PremiumTransition(
+          page: OtpScreen(
+            phoneNumber: finalNumber,
+            authService: _authService,
+            isNewUser: !exists,
+            existingPartner: exists ? partner : null,
+          ),
+        ),
+      );
+      
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      
+      PopupUtils.showErrorNotification(
+        context,
+        'Connection error. Please check your internet.',
+      );
+    }
   }
 
   @override
@@ -76,61 +139,23 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFF00FF00), width: 2),
                       ),
-                      counterStyle: const TextStyle(color: Colors.white54), // length counter
+                      counterStyle: const TextStyle(color: Colors.white54),
                     ),
                     style: const TextStyle(fontSize: 18),
-                    initialCountryCode: 'IN', // Default to India
+                    initialCountryCode: 'IN',
                     dropdownTextStyle: const TextStyle(color: Colors.white, fontSize: 18),
                     dropdownIcon: const Icon(Icons.arrow_drop_down, color: Colors.white54),
                     onChanged: (phone) {
                       _completePhoneNumber = phone.completeNumber;
                     },
+                    onSubmitted: (_) => _handleSubmit(),
                   ),
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              String rawNumber = _phoneController.text.trim().replaceAll(' ', '');
-                              if (rawNumber.length != 10) {
-                                PopupUtils.showErrorNotification(
-                                  context,
-                                  'Please enter a valid 10-digit number',
-                                );
-                                return;
-                              }
-                              
-                              // Strictly format for API
-                              String finalNumber = "+91$rawNumber";
-                              print("Sending OTP to: $finalNumber"); // Debug log
-
-                              setState(() {
-                                _isLoading = true;
-                              });
-
-                              // STATIC OTP MODE - SKIP API CALL
-                              setState(() {
-                                _isLoading = false;
-                              });
-
-                              PopupUtils.showSuccessNotification(
-                                context,
-                                'Use static OTP: 111111',
-                              );
-                              Navigator.push(
-                                context,
-                                PremiumTransition(
-                                  page: OtpScreen(
-                                    phoneNumber: finalNumber,
-                                    authService: _authService,
-                                    isNewUser: false,
-                                  ),
-                                ),
-                              );
-                            },
+                      onPressed: _isLoading ? null : _handleSubmit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00FF00),
                         foregroundColor: Colors.black,
@@ -142,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: _isLoading
                           ? const CircularProgressIndicator(color: Colors.black)
                           : const Text(
-                              'Send OTP',
+                              'Continue',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../services/api_partner_service.dart'; // NEW: API service
+import '../services/api_partner_service.dart';
 import '../utils/popup_utils.dart';
 import '../utils/transitions.dart';
 import 'onboarding/welcome_partner_screen.dart';
@@ -9,14 +9,16 @@ import 'dashboard/main_dashboard_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
-  final ApiPartnerService authService; // NEW: Changed type
+  final ApiPartnerService authService;
   final bool isNewUser;
+  final Map<String, dynamic>? existingPartner;
 
   const OtpScreen({
     super.key,
     required this.phoneNumber,
     required this.authService,
     required this.isNewUser,
+    this.existingPartner,
   });
 
   @override
@@ -27,7 +29,6 @@ class _OtpScreenState extends State<OtpScreen> {
   final TextEditingController _otpController = TextEditingController();
   bool _isLoading = false;
   
-  // Timer State
   int _resendTimeout = 30;
   Timer? _timer;
   bool _canResend = false;
@@ -47,27 +48,18 @@ class _OtpScreenState extends State<OtpScreen> {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_resendTimeout == 0) {
-        setState(() {
-          _canResend = true;
-        });
+        setState(() => _canResend = true);
         timer.cancel();
       } else {
-        setState(() {
-          _resendTimeout--;
-        });
+        setState(() => _resendTimeout--);
       }
     });
   }
 
   void _resendOTP() {
     if (!_canResend) return;
-
-    // SKIP OTP SENDING - STATIC MODE
     _startResendTimer();
-    PopupUtils.showSuccessNotification(
-      context,
-      'Use static OTP: 111111',
-    );
+    PopupUtils.showSuccessNotification(context, 'Use static OTP: 111111');
   }
 
   @override
@@ -79,44 +71,59 @@ class _OtpScreenState extends State<OtpScreen> {
 
   void _verifyOTP() async {
     final cleanOtp = _otpController.text.trim();
+    
     if (cleanOtp.length != 6) {
-      PopupUtils.showErrorNotification(
-        context,
-        'Please enter the complete 6-digit OTP',
-      );
+      PopupUtils.showErrorNotification(context, 'Please enter complete 6-digit OTP');
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    if (cleanOtp != '111111') {
+      PopupUtils.showErrorNotification(context, 'Invalid OTP. Use 111111');
+      return;
+    }
 
-    // OFFLINE STATIC OTP MODE - NO API CALL
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate processing
+    setState(() => _isLoading = true);
+    await Future.delayed(const Duration(milliseconds: 500));
     
     if (!mounted) return;
-    setState(() => _isLoading = false);
 
-    if (cleanOtp == '111111') {
-      // Static OTP accepted
-      PopupUtils.showSuccessNotification(
-        context,
-        'Welcome to Skiplaain!',
-      );
-
+    if (widget.isNewUser) {
+      // NEW USER → Go to onboarding
+      setState(() => _isLoading = false);
+      PopupUtils.showSuccessNotification(context, 'Welcome to Skiplaain!');
+      
       await Future.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
 
-      // Navigate to onboarding for new partner
       Navigator.pushAndRemoveUntil(
         context,
         PremiumTransition(page: WelcomePartnerScreen(phoneNumber: widget.phoneNumber)),
         (route) => false,
       );
     } else {
-      PopupUtils.showErrorNotification(
+      // EXISTING USER → Save session and go to dashboard
+      final partnerId = widget.existingPartner?['id'];
+      
+      if (partnerId != null) {
+        await widget.authService.savePartnerSession(
+          phoneNumber: widget.phoneNumber,
+          partnerId: partnerId,
+        );
+      }
+      
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      
+      final salonName = widget.existingPartner?['salonName'] ?? 'Partner';
+      PopupUtils.showSuccessNotification(context, 'Welcome back, $salonName!');
+      
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+
+      Navigator.pushAndRemoveUntil(
         context,
-        'Invalid OTP. Please use 111111',
+        PremiumTransition(page: const MainDashboardScreen()),
+        (route) => false,
       );
     }
   }
@@ -144,55 +151,39 @@ class _OtpScreenState extends State<OtpScreen> {
                 children: [
                   const SizedBox(height: 20),
                   Center(
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      height: 80,
-                      fit: BoxFit.contain,
-                    ),
+                    child: Image.asset('assets/images/logo.png', height: 80, fit: BoxFit.contain),
                   ),
                   const SizedBox(height: 40),
                   Text(
                     widget.isNewUser ? 'Welcome to Skiplaain!' : 'Welcome Back!',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600, color: Colors.white),
                   ),
                   const SizedBox(height: 8),
                   RichText(
                     text: TextSpan(
                       text: widget.isNewUser 
                           ? 'Enter code to set up your salon: '
-                          : 'Enter the 6-digit code sent to ',
+                          : 'Enter verification code sent to ',
                       style: const TextStyle(fontSize: 15, color: Colors.white70),
                       children: [
                         TextSpan(
                           text: widget.phoneNumber,
-                          style: const TextStyle(
-                            color: Color(0xFF00FF00),
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: const TextStyle(color: Color(0xFF00FF00), fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 36),
                   
-                  // ORIGINAL 6-BOX PREMIUM OTP UI
+                  // 6-Box OTP UI
                   Center(
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // 6 Individual Square Boxes
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(6, (index) {
-                            String char = "";
-                            if (_otpController.text.length > index) {
-                              char = _otpController.text[index];
-                            }
-
+                            String char = _otpController.text.length > index ? _otpController.text[index] : "";
                             bool isFocused = _otpController.text.length == index;
                             bool isFilled = char.isNotEmpty;
 
@@ -205,36 +196,16 @@ class _OtpScreenState extends State<OtpScreen> {
                                   color: const Color(0xFF141414),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isFocused
-                                        ? const Color(0xFF00FF00)
-                                        : (isFilled
-                                            ? const Color(0xFF00FF00).withOpacity(0.6)
-                                            : const Color(0xFF262626)),
+                                    color: isFocused ? const Color(0xFF00FF00) : (isFilled ? const Color(0xFF00FF00).withOpacity(0.6) : const Color(0xFF262626)),
                                     width: isFocused ? 2 : 1.2,
                                   ),
-                                  boxShadow: isFocused
-                                      ? [
-                                          BoxShadow(
-                                            color: const Color(0xFF00FF00).withOpacity(0.25),
-                                            blurRadius: 10,
-                                          ),
-                                        ]
-                                      : [],
+                                  boxShadow: isFocused ? [BoxShadow(color: const Color(0xFF00FF00).withOpacity(0.25), blurRadius: 10)] : [],
                                 ),
-                                child: Text(
-                                  char,
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                  ),
-                                ),
+                                child: Text(char, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
                               ),
                             );
                           }),
                         ),
-
-                        // Invisible Input Handler
                         Positioned.fill(
                           child: Opacity(
                             opacity: 0,
@@ -244,15 +215,10 @@ class _OtpScreenState extends State<OtpScreen> {
                               keyboardType: TextInputType.number,
                               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                               autofocus: true,
-                              decoration: const InputDecoration(
-                                counterText: "",
-                                border: InputBorder.none,
-                              ),
+                              decoration: const InputDecoration(counterText: "", border: InputBorder.none),
                               onChanged: (val) {
                                 setState(() {});
-                                if (val.length == 6) {
-                                  _verifyOTP();
-                                }
+                                if (val.length == 6) _verifyOTP();
                               },
                             ),
                           ),
@@ -267,21 +233,11 @@ class _OtpScreenState extends State<OtpScreen> {
                     child: _canResend
                         ? TextButton(
                             onPressed: _resendOTP,
-                            child: const Text(
-                              'Resend Code',
-                              style: TextStyle(
-                                color: Color(0xFF00FF00),
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            child: const Text('Resend Code', style: TextStyle(color: Color(0xFF00FF00), fontSize: 14, fontWeight: FontWeight.bold)),
                           )
                         : Text(
                             'Resend code in 00:${_resendTimeout.toString().padLeft(2, '0')}',
-                            style: const TextStyle(
-                              color: Colors.white38,
-                              fontSize: 14,
-                            ),
+                            style: const TextStyle(color: Colors.white38, fontSize: 14),
                           ),
                   ),
                   
@@ -295,28 +251,12 @@ class _OtpScreenState extends State<OtpScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00FF00),
                         foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
                       ),
                       child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.black,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              'Verify & Proceed',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                          : const Text('Verify & Continue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                     ),
                   ),
                   const SizedBox(height: 24),

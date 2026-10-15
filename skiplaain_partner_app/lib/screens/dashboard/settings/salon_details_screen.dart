@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../services/api_partner_service.dart';
 
 class SalonDetailsScreen extends StatefulWidget {
   const SalonDetailsScreen({super.key});
@@ -8,8 +9,9 @@ class SalonDetailsScreen extends StatefulWidget {
 }
 
 class _SalonDetailsScreenState extends State<SalonDetailsScreen> {
-  final TextEditingController _nameController = TextEditingController(text: 'Yash Styles Salon');
-  final TextEditingController _phoneController = TextEditingController(text: '8553535342');
+  final ApiPartnerService _apiService = ApiPartnerService();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _shopAddressController = TextEditingController();
   final TextEditingController _landmarkController = TextEditingController();
   final TextEditingController _cityController = TextEditingController();
@@ -18,6 +20,31 @@ class _SalonDetailsScreenState extends State<SalonDetailsScreen> {
   
   double? _latitude;
   double? _longitude;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPartnerData();
+  }
+
+  Future<void> _loadPartnerData() async {
+    try {
+      final data = await _apiService.getPartnerProfile();
+      setState(() {
+        _nameController.text = data['salonName'] ?? '';
+        _phoneController.text = data['phone'] ?? '';
+        _shopAddressController.text = data['address'] ?? '';
+        _cityController.text = data['city'] ?? '';
+        _pincodeController.text = data['pincode'] ?? '';
+        _latitude = data['latitude'];
+        _longitude = data['longitude'];
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -73,6 +100,18 @@ class _SalonDetailsScreenState extends State<SalonDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: const Text('Salon Details'),
+          centerTitle: true,
+        ),
+        body: const Center(child: CircularProgressIndicator(color: Color(0xFF00FF00))),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(

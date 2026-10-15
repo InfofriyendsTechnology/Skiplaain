@@ -1,13 +1,41 @@
 import 'package:flutter/material.dart';
 import '../../../services/partner_service.dart';
+import '../../../services/api_partner_service.dart';
 import '../../login_screen.dart';
 import '../settings/manage_services_screen.dart';
 import '../settings/manage_barbers_screen.dart';
 import '../settings/business_hours_screen.dart';
 import '../settings/salon_details_screen.dart';
 
-class ProfileTab extends StatelessWidget {
+class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
+
+  @override
+  State<ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<ProfileTab> {
+  final ApiPartnerService _apiService = ApiPartnerService();
+  Map<String, dynamic>? _partnerData;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPartnerData();
+  }
+
+  Future<void> _loadPartnerData() async {
+    try {
+      final data = await _apiService.getPartnerProfile();
+      setState(() {
+        _partnerData = data;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   Widget _buildListTile(IconData icon, String title, VoidCallback onTap) {
     return ListTile(
@@ -60,41 +88,58 @@ class ProfileTab extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFF2A2A2A)),
             ),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(30),
-                  child: Image.asset(
-                    'assets/images/bird_icon.png',
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF00FF00)))
+                : Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(30),
+                        child: _partnerData?['profileImage'] != null
+                            ? Image.network(
+                                _partnerData!['profileImage'],
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Image.asset(
+                                  'assets/images/bird_icon.png',
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Image.asset(
+                                'assets/images/bird_icon.png',
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                              ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _partnerData?['salonName'] ?? 'Salon Name',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _partnerData?['phone'] ?? '+91 00000 00000',
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Yash Styles Salon',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      '+91 85535 35342',
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
           ),
           
           const SizedBox(height: 32),

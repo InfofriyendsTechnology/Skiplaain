@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class PopupUtils {
   PopupUtils._();
 
-  static Future<void> showSuccess(ontext context, {
+  static Future<void> showSuccess(BuildContext context, {
     required String message,
     String? title,
     Duration duration = const Duration(seconds: 3),

@@ -32,8 +32,37 @@ class _CustomerOnboardingScreenState extends State<CustomerOnboardingScreen> {
   int _resendTimeout = 30;
   Timer? _resendTimer;
 
-  String get _salonName => (widget.salon['salonName'] ?? widget.salon['businessName'] ?? 'Salon').toString();
-  String get _salonAddress => (widget.salon['address'] ?? widget.salon['location'] ?? 'Surat').toString();
+  String get _salonName {
+    try {
+      final name = widget.salon['salonName'] ?? 
+                   widget.salon['businessName'] ?? 
+                   widget.salon['salon_name'] ?? 
+                   widget.salon['business_name'] ??
+                   widget.salon['name'];
+      
+      if (name == null) return 'Salon';
+      
+      final nameStr = name.toString().trim();
+      return nameStr.isEmpty ? 'Salon' : nameStr;
+    } catch (e) {
+      return 'Salon';
+    }
+  }
+
+  String get _salonAddress {
+    try {
+      final address = widget.salon['address'] ?? 
+                     widget.salon['location'] ?? 
+                     widget.salon['city'];
+      
+      if (address == null) return 'Location';
+      
+      final addressStr = address.toString().trim();
+      return addressStr.isEmpty ? 'Location' : addressStr;
+    } catch (e) {
+      return 'Location';
+    }
+  }
 
   @override
   void dispose() {
@@ -138,18 +167,33 @@ class _CustomerOnboardingScreenState extends State<CustomerOnboardingScreen> {
     });
 
     try {
+      // Save profile locally
       await _authService.setCustomerProfile(name, fullPhone);
-      await _authService.connectSalon(widget.salon);
+      
+      // Ensure salon has required fields with fallbacks
+      final safeSalon = {
+        'id': widget.salon['id'] ?? '',
+        'salonName': _salonName,
+        'address': _salonAddress,
+        'phone': widget.salon['phone'] ?? '',
+        'ownerName': widget.salon['ownerName'] ?? '',
+        'city': widget.salon['city'] ?? '',
+        ...widget.salon, // Merge all other fields
+      };
+      
+      // Connect to salon
+      await _authService.connectSalon(safeSalon);
 
-      // Save to Cloud Firestore
+      // Register in cloud (Firebase for real-time features)
       await _authService.registerCustomerInCloud(
         name: name,
         phone: fullPhone,
-        salon: widget.salon,
+        salon: safeSalon,
       );
 
       if (!mounted) return;
 
+      // Success - go to home
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
@@ -158,7 +202,7 @@ class _CustomerOnboardingScreenState extends State<CustomerOnboardingScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Failed to register: $e';
+          _errorMessage = 'Registration failed: $e';
         });
       }
     }

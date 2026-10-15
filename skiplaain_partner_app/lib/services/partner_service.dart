@@ -118,39 +118,13 @@ class PartnerService {
     List<Map<String, dynamic>>? barbers,
     String status = 'active',
   }) async {
-    final cleanPhone = phoneNumber.replaceAll(RegExp(r'\D'), '');
-    final targetUid = uid ?? 'partner_${cleanPhone.isEmpty ? "default_salon" : cleanPhone}';
-
-    final defaultBarbers = barbers ?? [];
-
-    final partnerData = {
-      'id': targetUid,
-      'salonName': salonName,
-      'businessName': salonName,
-      'ownerName': 'Partner Owner',
-      'phone': phoneNumber,
-      'category': category,
-      'address': address,
-      'location': address,
-      'openingTime': openingTime,
-      'closingTime': closingTime,
-      'weeklyOff': weeklyOff,
-      'services': services,
-      'barbers': defaultBarbers,
-      'status': status,
-      'rating': 5.0,
-      'reviewCount': 0,
-      'totalEarnings': 0,
-      'totalAppointments': 0,
-      'isOnboarded': true,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    await _firestore.collection('partners').doc(targetUid).set(partnerData, SetOptions(merge: true));
-
-    // Save session in memory & SharedPreferences
-    await savePartnerSession(phoneNumber: phoneNumber, partnerId: targetUid);
+    // USE API INSTEAD OF FIREBASE
+    // This will be handled by ApiPartnerService.registerPartner()
+    // For now, just save session - the partner record was already created during OTP verification
+    await savePartnerSession(phoneNumber: phoneNumber, partnerId: uid);
+    
+    // TODO: Update partner profile via API with salon details
+    // Call PATCH /api/partners/:id with salonName, address, services, barbers, etc.
   }
 
   /// Update only barbers list for a partner salon

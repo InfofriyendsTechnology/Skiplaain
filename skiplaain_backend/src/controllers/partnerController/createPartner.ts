@@ -21,11 +21,25 @@ export const createPartner = async (req: Request, res: Response) => {
 
     // Check if partner already exists
     const existing = await prisma.partner.findUnique({ where: { phone } });
+    
     if (existing) {
-      return responseHandler.badRequest(res, 'Partner with this phone already exists');
+      // Partner exists - return existing data (Google-grade: auto-login)
+      const existingWithRelations = await prisma.partner.findUnique({
+        where: { phone },
+        include: {
+          barbers: true,
+          services: true,
+        },
+      });
+      
+      return responseHandler.success(
+        res,
+        existingWithRelations,
+        'Welcome back! Redirecting to dashboard...'
+      );
     }
 
-    // Create partner with barbers and services
+    // Create new partner
     const partner = await prisma.partner.create({
       data: {
         phone,

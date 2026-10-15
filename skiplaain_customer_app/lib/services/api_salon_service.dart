@@ -4,9 +4,9 @@ import 'api_service.dart';
 class ApiSalonService {
   final ApiService _api = ApiService();
 
-  /// Get all approved salons/partners
+  /// Get all salons/partners (no status filter for search)
   Future<List<Map<String, dynamic>>> getAllSalons() async {
-    final result = await _api.get('/partners?status=approved');
+    final result = await _api.get('/partners');
 
     if (result['success'] == true) {
       return List<Map<String, dynamic>>.from(result['data'] ?? []);
@@ -26,22 +26,25 @@ class ApiSalonService {
     return null;
   }
 
-  /// Search salons (client-side filtering for now)
-  Future<List<Map<String, dynamic>>> searchSalons(String query) async {
-    final allSalons = await getAllSalons();
-    
-    if (query.isEmpty) return allSalons;
+  /// Search salons using backend API (optimized)
+  Future<List<Map<String, dynamic>>> searchSalons(String query, {String? city}) async {
+    if (query.isEmpty && city == null) {
+      return await getAllSalons();
+    }
 
-    final lowerQuery = query.toLowerCase();
-    return allSalons.where((salon) {
-      final name = (salon['salonName'] ?? '').toString().toLowerCase();
-      final address = (salon['address'] ?? '').toString().toLowerCase();
-      final city = (salon['city'] ?? '').toString().toLowerCase();
-      
-      return name.contains(lowerQuery) ||
-             address.contains(lowerQuery) ||
-             city.contains(lowerQuery);
-    }).toList();
+    // Build query params
+    final params = <String>[];
+    if (query.isNotEmpty) params.add('search=$query');
+    if (city != null && city.isNotEmpty) params.add('city=$city');
+    
+    final queryString = params.isNotEmpty ? '?${params.join('&')}' : '';
+    final result = await _api.get('/partners$queryString');
+
+    if (result['success'] == true) {
+      return List<Map<String, dynamic>>.from(result['data'] ?? []);
+    }
+
+    return [];
   }
 
   /// Get salon services

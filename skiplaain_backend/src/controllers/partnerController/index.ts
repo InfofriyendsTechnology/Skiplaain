@@ -4,3 +4,4 @@ export * from './createPartner';
 export * from './updatePartner';
 export * from './deletePartner';
 export * from './updatePartnerStatus';
+export * from './checkPhone';
