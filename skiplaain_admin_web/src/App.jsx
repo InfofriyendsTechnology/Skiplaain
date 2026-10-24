@@ -1,10 +1,11 @@
 import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from './context/AuthContext';
 import AppRoutes from './routes/AppRoutes';
 import './styles/main.scss';
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -23,7 +24,7 @@ function App() {
         }}
       />
       <AppRoutes />
-    </>
+    </AuthProvider>
   );
 }
 

@@ -1,9 +1,10 @@
 import { Navigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const ProtectedRoute = ({ children }) => {
-  const isAuth = sessionStorage.getItem('skiplaain_admin_auth') === 'true';
+  const { isAuthenticated } = useAuth();
 
-  if (!isAuth) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 

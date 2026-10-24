@@ -160,6 +160,7 @@ const SettingsPage = () => {
   };
 
   const handleLogout = () => {
+    logout();
     localStorage.removeItem('admin_token');
     sessionStorage.removeItem('skiplaain_admin_auth');
     toast.success('Logged out');

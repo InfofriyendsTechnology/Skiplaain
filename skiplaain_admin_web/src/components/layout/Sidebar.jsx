@@ -1,6 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { FiGrid, FiUsers, FiUserCheck, FiCalendar, FiSettings, FiLogOut, FiDollarSign } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 import './Sidebar.scss';
 
 const navItems = [
@@ -15,9 +16,10 @@ const navItems = [
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleLogout = () => {
-    sessionStorage.removeItem('skiplaain_admin_auth');
+    logout();
     toast.success('Logged out');
     navigate('/login');
   };

@@ -3,16 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 import './LoginPage.scss';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login, isLoading } = useAuth();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
     if (!email.trim() || !password.trim()) {
@@ -20,22 +21,13 @@ const LoginPage = () => {
       return;
     }
 
-    setIsLoading(true);
-
-    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
-
-    setTimeout(() => {
-      if (email === adminEmail && password === adminPassword) {
-        sessionStorage.setItem('skiplaain_admin_auth', 'true');
-        toast.success('Welcome, Admin!');
-        // Force a full page navigation to break the loop
-        window.location.href = '/';
-      } else {
-        toast.error('Invalid credentials');
-        setIsLoading(false);
-      }
-    }, 600);
+    try {
+      await login(email, password);
+      toast.success('Welcome, Admin!');
+      navigate('/', { replace: true });
+    } catch (error) {
+      toast.error('Invalid credentials');
+    }
   };
 
   return (
