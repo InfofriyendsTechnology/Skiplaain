@@ -1,17 +1,10 @@
 import 'dart:convert';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CustomerAuthService {
   static final CustomerAuthService _instance = CustomerAuthService._internal();
   factory CustomerAuthService() => _instance;
   CustomerAuthService._internal();
-
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  User? get currentUser => _auth.currentUser;
 
   String? _customerPhone;
   String _customerName = '';
@@ -35,7 +28,7 @@ class CustomerAuthService {
   bool get isConnectedToSalon => _connectedSalon != null;
   bool get isLoggedIn => _customerPhone != null && _customerPhone!.isNotEmpty && _customerName.isNotEmpty;
 
-  /// Load session from local storage & Cloud Firestore on app start
+  /// Load session from local storage on app start
   Future<void> initSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -57,39 +50,8 @@ class CustomerAuthService {
       } else if (_savedSalons.isNotEmpty) {
         _connectedSalon = _savedSalons.first;
       }
-
-      // If user has phone but no active salon in local storage, sync from Cloud Firestore
-      if (_customerPhone != null && _customerPhone!.isNotEmpty && _connectedSalon == null) {
-        await _syncFromCloudFirestore(_customerPhone!);
-      }
     } catch (_) {}
     _isInitialized = true;
-  }
-
-  Future<void> _syncFromCloudFirestore(String phone) async {
-    try {
-      final custDoc = await _firestore.collection('customers').doc(phone).get();
-      if (custDoc.exists && custDoc.data() != null) {
-        final data = custDoc.data()!;
-        if (_customerName.isEmpty && data['name'] != null) {
-          _customerName = data['name'].toString();
-        }
-
-        final activeSalonId = data['activeSalonId']?.toString();
-        if (activeSalonId != null && activeSalonId.isNotEmpty) {
-          final salonDoc = await _firestore.collection('partners').doc(activeSalonId).get();
-          if (salonDoc.exists && salonDoc.data() != null) {
-            final salonData = Map<String, dynamic>.from(salonDoc.data()!);
-            salonData['id'] = salonDoc.id;
-            _connectedSalon = salonData;
-            if (!_savedSalons.any((s) => (s['id'] ?? '').toString() == activeSalonId)) {
-              _savedSalons.insert(0, salonData);
-            }
-            await _persistSession();
-          }
-        }
-      }
-    } catch (_) {}
   }
 
   Future<void> _persistSession() async {
@@ -130,25 +92,18 @@ class CustomerAuthService {
   Future<void> updateCustomerName(String newName) async {
     _customerName = newName.trim();
     await _persistSession();
-    if (_customerPhone != null && _customerPhone!.isNotEmpty) {
-      try {
-        await _firestore.collection('customers').doc(_customerPhone!).set({
-          'name': _customerName,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      } catch (_) {}
-    }
   }
 
-  /// Check if phone number already exists in Firestore
+  /// Check if phone number already exists locally
   Future<bool> isPhoneNumberRegistered(String phoneNumber) async {
     try {
       final cleanPhone = phoneNumber.trim().startsWith('+')
           ? phoneNumber.trim()
           : '+91${phoneNumber.trim().replaceAll(RegExp(r'\D'), '')}';
       
-      final doc = await _firestore.collection('customers').doc(cleanPhone).get();
-      return doc.exists;
+      final prefs = await SharedPreferences.getInstance();
+      final storedPhone = prefs.getString('customer_phone');
+      return storedPhone == cleanPhone;
     } catch (e) {
       return false;
     }
@@ -201,47 +156,17 @@ class CustomerAuthService {
     }
   }
 
-  /// Register customer in Cloud Firestore (in `customers` and linked to `partners/{salonId}`)
-  Future<void> registerCustomerInCloud({
+  /// Register customer (local storage only - using Neon PostgreSQL backend)
+  Future<void> registerCustomer({
     required String name,
     required String phone,
     required Map<String, dynamic> salon,
   }) async {
-    final cleanPhone = phone.startsWith('+') ? phone : '+91${phone.replaceAll(RegExp(r'\D'), '')}';
-    final salonId = (salon['id'] ?? 'salon_id').toString();
-    final salonName = (salon['salonName'] ?? salon['businessName'] ?? 'Salon').toString();
-
-    final customerData = {
-      'id': cleanPhone,
-      'name': name,
-      'phone': cleanPhone,
-      'activeSalonId': salonId,
-      'activeSalonName': salonName,
-      'connectedSalons': FieldValue.arrayUnion([salonId]),
-      'lastActive': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    // 1. Save in global customers collection
-    await _firestore.collection('customers').doc(cleanPhone).set(customerData, SetOptions(merge: true));
-
-    // 2. Also register under the partner salon's customer registry for partner dashboard
-    try {
-      await _firestore.collection('partners').doc(salonId).collection('customers').doc(cleanPhone).set({
-        'name': name,
-        'phone': cleanPhone,
-        'connectedAt': FieldValue.serverTimestamp(),
-        'lastVisit': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      // Increment total customers count in partner document
-      await _firestore.collection('partners').doc(salonId).update({
-        'totalCustomers': FieldValue.increment(1),
-      });
-    } catch (_) {}
+    await setCustomerProfile(name, phone);
+    await connectSalon(salon);
   }
 
-  /// Verify OTP and complete cloud registration & connect
+  /// Verify OTP and complete registration & connect
   Future<void> verifyOtpAndConnect({
     required String otp,
     required String name,
@@ -254,10 +179,6 @@ class CustomerAuthService {
       if (otp.trim() == "111111") {
         await setCustomerProfile(name, phone);
         await connectSalon(salon);
-
-        // Save in Firestore cloud
-        await registerCustomerInCloud(name: name, phone: phone, salon: salon);
-
         onSuccess();
       } else {
         onError("Invalid OTP. Use 111111 for testing.");

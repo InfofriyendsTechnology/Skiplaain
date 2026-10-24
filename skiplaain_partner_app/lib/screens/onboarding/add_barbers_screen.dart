@@ -351,8 +351,8 @@ class _AddBarbersScreenState extends State<AddBarbersScreen> {
                                   height: 42,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: const Color(0xFF00FF00).withOpacity(0.15),
-                                    border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.4)),
+                                    color: const Color(0xFF00FF00).withValues(alpha: 0.15),
+                                    border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.4)),
                                   ),
                                   alignment: Alignment.center,
                                   child: Text(

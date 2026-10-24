@@ -235,7 +235,7 @@ class _WelcomePartnerScreenState extends State<WelcomePartnerScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xFF1A1A1A),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Color(0xFF00FF00).withOpacity(0.2)),
+                          border: Border.all(color: Color(0xFF00FF00).withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           children: [

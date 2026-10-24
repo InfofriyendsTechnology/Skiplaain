@@ -82,7 +82,7 @@ class _ManageServicesScreenState extends State<ManageServicesScreen> {
                         service['active'] = val;
                       });
                     },
-                    activeColor: Colors.black,
+                    activeThumbColor: Colors.black,
                     activeTrackColor: const Color(0xFF00FF00),
                     inactiveThumbColor: Colors.black,
                     inactiveTrackColor: Colors.grey,

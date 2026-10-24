@@ -66,7 +66,7 @@ class _PremiumMembershipScreenState extends State<PremiumMembershipScreen> {
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.4), width: 1.5),
+                    border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.4), width: 1.5),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,7 +77,7 @@ class _PremiumMembershipScreenState extends State<PremiumMembershipScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF00FF00).withOpacity(0.2),
+                              color: const Color(0xFF00FF00).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Row(
@@ -227,7 +227,7 @@ class _PremiumMembershipScreenState extends State<PremiumMembershipScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF00FF00).withOpacity(0.12),
+                color: const Color(0xFF00FF00).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: const Color(0xFF00FF00), size: 20),
@@ -308,7 +308,7 @@ class _PremiumMembershipScreenState extends State<PremiumMembershipScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: isPopular ? const Color(0xFF00FF00).withOpacity(0.2) : const Color(0xFF262626),
+                          color: isPopular ? const Color(0xFF00FF00).withValues(alpha: 0.2) : const Color(0xFF262626),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(

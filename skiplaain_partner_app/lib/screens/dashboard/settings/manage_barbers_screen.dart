@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../services/partner_service.dart';
 
 class ManageBarbersScreen extends StatefulWidget {
@@ -12,12 +11,45 @@ class ManageBarbersScreen extends StatefulWidget {
 
 class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
   final PartnerService _partnerService = PartnerService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   static const List<String> _allWeekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   String get _currentPartnerId => _partnerService.currentUid;
   String get _currentPhone => _partnerService.currentPhone;
+
+  List<Map<String, dynamic>> _barbers = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBarbers();
+  }
+
+  Future<void> _loadBarbers() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final partnerId = _partnerService.currentPartnerId;
+      if (partnerId != null) {
+        final partnerData = await _partnerService.getPartnerProfile(partnerId);
+        if (partnerData != null) {
+          final rawBarbers = partnerData['barbers'] as List<dynamic>?;
+          setState(() {
+            _barbers = (rawBarbers != null && rawBarbers.isNotEmpty)
+                ? rawBarbers.map((b) => Map<String, dynamic>.from(b as Map)).toList()
+                : [];
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      print('Error loading barbers: $e');
+    }
+    
+    setState(() => _isLoading = false);
+  }
 
   void _showAddOrEditBarberDialog({
     Map<String, dynamic>? barber,
@@ -214,7 +246,7 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
                           decoration: BoxDecoration(
                             color: const Color(0xFF331616),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.5)),
+                            border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.5)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -257,7 +289,7 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
                         ),
                         Switch(
                           value: isAvailable,
-                          activeColor: const Color(0xFF00FF00),
+                          activeThumbColor: const Color(0xFF00FF00),
                           onChanged: (val) => setDialogState(() => isAvailable = val),
                         ),
                       ],
@@ -347,99 +379,74 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
           style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _firestore.collection('partners').snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFF00FF00)));
-          }
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF00FF00)))
+          : _buildBarbersContent(),
+    );
+  }
 
-          final docs = snapshot.data!.docs;
-          DocumentSnapshot<Map<String, dynamic>>? partnerDoc;
+  Widget _buildBarbersContent() {
+    final cleanPhone = _currentPhone.replaceAll(RegExp(r'\D'), '');
+    final docId = _currentPartnerId;
+    final availableCount = _barbers.where((b) => b['isAvailable'] == true).length;
 
-          for (var d in docs) {
-            final data = d.data();
-            final phone = (data['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
-            if (d.id == _currentPartnerId || d.id == 'partner_$cleanPhone' || (cleanPhone.isNotEmpty && phone.contains(cleanPhone))) {
-              partnerDoc = d;
-              break;
-            }
-          }
-
-          partnerDoc ??= docs.isNotEmpty ? docs.first : null;
-
-          if (partnerDoc == null) {
-            return const Center(
-              child: Text('Salon profile not found', style: TextStyle(color: Colors.white54)),
-            );
-          }
-
-          final salonData = partnerDoc.data() ?? {};
-          final docId = partnerDoc.id;
-          final rawBarbers = salonData['barbers'] as List<dynamic>?;
-          final List<Map<String, dynamic>> barbers = (rawBarbers != null && rawBarbers.isNotEmpty)
-              ? rawBarbers.map((b) => Map<String, dynamic>.from(b as Map)).toList()
-              : [];
-
-          final availableCount = barbers.where((b) => b['isAvailable'] == true).length;
-
-          return Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Summary Header Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF141414),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF262626)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Summary Header Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141414),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF262626)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Active Staff & Schedules', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$availableCount of ${barbers.length} Barbers Available Today',
-                            style: const TextStyle(color: Color(0xFF00FF00), fontSize: 12, fontWeight: FontWeight.w700),
-                          ),
-                        ],
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => _showAddOrEditBarberDialog(currentList: barbers, docId: docId),
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Add Staff'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00FF00),
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-                        ),
-                      ),
-                    ],
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Active Staff & Schedules', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$availableCount of ${_barbers.length} Barbers Available Today',
+                      style: const TextStyle(color: Color(0xFF00FF00), fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _showAddOrEditBarberDialog(currentList: _barbers, docId: docId),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Add Staff'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF00),
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
                   ),
                 ),
+              ],
+            ),
+          ),
 
-                const SizedBox(height: 20),
+          const SizedBox(height: 20),
 
-                const Text(
-                  'Salon Staff & Schedules',
-                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
+          const Text(
+            'Salon Staff & Schedules',
+            style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
 
-                Expanded(
-                  child: barbers.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.people_outline_rounded, color: Colors.white24, size: 48),
+          Expanded(
+            child: _barbers.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.people_outline_rounded, color: Colors.white24, size: 48),
                               const SizedBox(height: 12),
                               const Text('No Barbers Added Yet', style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
@@ -482,7 +489,7 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
                                 color: const Color(0xFF141414),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: isAvailable ? const Color(0xFF00FF00).withOpacity(0.3) : const Color(0xFF262626),
+                                  color: isAvailable ? const Color(0xFF00FF00).withValues(alpha: 0.3) : const Color(0xFF262626),
                                 ),
                               ),
                               child: Row(
@@ -492,7 +499,7 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
                                     height: 44,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: isAvailable ? const Color(0xFF00FF00).withOpacity(0.15) : const Color(0xFF1E1E1E),
+                                      color: isAvailable ? const Color(0xFF00FF00).withValues(alpha: 0.15) : const Color(0xFF1E1E1E),
                                       border: Border.all(color: isAvailable ? const Color(0xFF00FF00) : const Color(0xFF333333)),
                                     ),
                                     alignment: Alignment.center,
@@ -523,7 +530,7 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
                                               decoration: BoxDecoration(
                                                 color: isAvailable ? const Color(0xFF162B16) : const Color(0xFF222222),
                                                 borderRadius: BorderRadius.circular(4),
-                                                border: Border.all(color: isAvailable ? const Color(0xFF00FF00).withOpacity(0.3) : const Color(0xFF333333)),
+                                                border: Border.all(color: isAvailable ? const Color(0xFF00FF00).withValues(alpha: 0.3) : const Color(0xFF333333)),
                                               ),
                                               child: Text(
                                                 isAvailable ? 'AVAILABLE' : 'ON LEAVE',

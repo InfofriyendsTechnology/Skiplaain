@@ -1,12 +1,17 @@
 import 'api_service.dart';
 
-/// NEW API-based Salon/Partner Service (replaces Firebase Firestore)
+/// NEW API-based Salon/Partner Service (uses /salons endpoints)
 class ApiSalonService {
   final ApiService _api = ApiService();
 
-  /// Get all salons/partners (no status filter for search)
-  Future<List<Map<String, dynamic>>> getAllSalons() async {
-    final result = await _api.get('/partners');
+  /// Get all approved salons (customer-safe endpoint)
+  Future<List<Map<String, dynamic>>> getAllSalons({String? city, String? search}) async {
+    final params = <String>[];
+    if (search != null && search.isNotEmpty) params.add('search=$search');
+    if (city != null && city.isNotEmpty) params.add('city=$city');
+    
+    final queryString = params.isNotEmpty ? '?${params.join('&')}' : '';
+    final result = await _api.get('/salons$queryString');
 
     if (result['success'] == true) {
       return List<Map<String, dynamic>>.from(result['data'] ?? []);
@@ -15,9 +20,9 @@ class ApiSalonService {
     return [];
   }
 
-  /// Get salon by ID
+  /// Get salon by ID (customer-safe endpoint)
   Future<Map<String, dynamic>?> getSalonById(String salonId) async {
-    final result = await _api.get('/partners/$salonId');
+    final result = await _api.get('/salons/$salonId');
 
     if (result['success'] == true) {
       return result['data'] as Map<String, dynamic>?;
@@ -28,26 +33,10 @@ class ApiSalonService {
 
   /// Search salons using backend API (optimized)
   Future<List<Map<String, dynamic>>> searchSalons(String query, {String? city}) async {
-    if (query.isEmpty && city == null) {
-      return await getAllSalons();
-    }
-
-    // Build query params
-    final params = <String>[];
-    if (query.isNotEmpty) params.add('search=$query');
-    if (city != null && city.isNotEmpty) params.add('city=$city');
-    
-    final queryString = params.isNotEmpty ? '?${params.join('&')}' : '';
-    final result = await _api.get('/partners$queryString');
-
-    if (result['success'] == true) {
-      return List<Map<String, dynamic>>.from(result['data'] ?? []);
-    }
-
-    return [];
+    return getAllSalons(search: query, city: city);
   }
 
-  /// Get salon services
+  /// Get salon services (already included in salon details)
   Future<List<Map<String, dynamic>>> getSalonServices(String salonId) async {
     final salon = await getSalonById(salonId);
     
@@ -58,7 +47,7 @@ class ApiSalonService {
     return [];
   }
 
-  /// Get salon barbers
+  /// Get salon barbers (already included in salon details)
   Future<List<Map<String, dynamic>>> getSalonBarbers(String salonId) async {
     final salon = await getSalonById(salonId);
     

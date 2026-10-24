@@ -49,12 +49,12 @@ class BookingTicketScreen extends StatelessWidget {
                     width: 68,
                     height: 68,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00FF00).withOpacity(0.12),
+                      color: const Color(0xFF00FF00).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                       border: Border.all(color: const Color(0xFF00FF00), width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00FF00).withOpacity(0.2),
+                          color: const Color(0xFF00FF00).withValues(alpha: 0.2),
                           blurRadius: 20,
                           spreadRadius: 2,
                         ),
@@ -132,9 +132,9 @@ class BookingTicketScreen extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF00FF00).withOpacity(0.2),
+                                  color: const Color(0xFF00FF00).withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.4)),
+                                  border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.4)),
                                 ),
                                 child: Text(
                                   timeSlot.toUpperCase(),

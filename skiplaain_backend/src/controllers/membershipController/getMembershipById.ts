@@ -7,7 +7,7 @@ export const getMembershipById = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     const membership = await prisma.membership.findUnique({
-      where: { id },
+      where: { id: id as string },
       include: {
         partner: true,
         customer: true,

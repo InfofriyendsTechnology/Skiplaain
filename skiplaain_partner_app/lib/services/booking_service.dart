@@ -1,204 +1,140 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'api_service.dart';
 
 class BookingService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ApiService _api = ApiService();
 
-  /// Create a new appointment booking in Cloud Firestore
-  Future<String> createBooking({
-    required String salonId,
-    required String salonName,
-    required String salonPhone,
-    required String salonAddress,
-    required String customerName,
-    required String customerPhone,
-    required List<Map<String, dynamic>> selectedServices,
-    required double totalAmount,
-    required String bookingDate,
-    required String timeSlot,
-    String? barberId,
-    String? barberName,
-    String? specialInstructions,
-  }) async {
-    final bookingId = 'SKP-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-    final serviceSummary = selectedServices.map((s) => s['name']).join(', ');
-
-    final bookingData = {
-      'id': bookingId,
-      'bookingId': bookingId,
-      'salonId': salonId,
-      'salonName': salonName,
-      'salonPhone': salonPhone,
-      'salonAddress': salonAddress,
-      'customerName': customerName,
-      'customerPhone': customerPhone,
-      'barberId': barberId ?? 'any',
-      'barberName': barberName ?? 'Any Available Barber',
-      'services': selectedServices,
-      'service': serviceSummary,
-      'totalAmount': totalAmount,
-      'price': '₹${totalAmount.toStringAsFixed(0)}',
-      'bookingDate': bookingDate,
-      'timeSlot': timeSlot,
-      'time': timeSlot,
-      'specialInstructions': specialInstructions ?? '',
-      'status': 'confirmed',
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    // Save to global bookings collection
-    await _firestore.collection('bookings').doc(bookingId).set(bookingData);
-
-    // Update partner stats
+  /// Get all bookings for a partner
+  Future<List<Map<String, dynamic>>> getPartnerBookings(String partnerId) async {
     try {
-      await _firestore.collection('partners').doc(salonId).update({
-        'totalAppointments': FieldValue.increment(1),
-        'totalEarnings': FieldValue.increment(totalAmount),
-      });
-    } catch (_) {}
-
-    return bookingId;
+      final response = await _api.get('/bookings/partner/$partnerId');
+      
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data'] ?? [];
+        return data.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching partner bookings: $e');
+      return [];
+    }
   }
 
-  /// Save / Activate Shop VIP Membership in Cloud Firestore
-  Future<Map<String, dynamic>> saveShopMembership({
-    required String salonId,
-    required String salonName,
-    required String customerPhone,
-    required String customerName,
-    required String planName,
-    required int price,
-    required int durationMonths,
-  }) async {
-    final membershipId = 'VIP-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-    final now = DateTime.now();
-    final expiryDate = now.add(Duration(days: durationMonths * 30));
-
-    final membershipData = {
-      'id': membershipId,
-      'membershipId': membershipId,
-      'salonId': salonId,
-      'salonName': salonName,
-      'customerPhone': customerPhone,
-      'customerName': customerName,
-      'planName': planName,
-      'price': price,
-      'durationMonths': durationMonths,
-      'status': 'active',
-      'activatedAt': now.toIso8601String(),
-      'expiresAt': expiryDate.toIso8601String(),
-      'expiryDisplay': '${expiryDate.day} ${_getMonthName(expiryDate.month)} ${expiryDate.year}',
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-
-    final docKey = '${salonId}_${customerPhone.replaceAll(RegExp(r'\D'), '')}';
-    await _firestore.collection('memberships').doc(docKey).set(membershipData);
-
-    return membershipData;
-  }
-
-  /// Stream membership for a specific salon & customer
-  Stream<Map<String, dynamic>?> streamSalonMembership(String salonId, String customerPhone) {
-    final cleanPhone = customerPhone.replaceAll(RegExp(r'\D'), '');
-    final docKey = '${salonId}_$cleanPhone';
-
-    return _firestore.collection('memberships').doc(docKey).snapshots().map((snap) {
-      if (snap.exists && snap.data() != null) {
-        return snap.data();
+  /// Get booking by ID
+  Future<Map<String, dynamic>?> getBookingById(String bookingId) async {
+    try {
+      final response = await _api.get('/bookings/$bookingId');
+      
+      if (response['success'] == true) {
+        return response['data'];
       }
       return null;
-    });
-  }
-
-  /// Stream all active memberships for a customer across all salons
-  Stream<List<Map<String, dynamic>>> streamCustomerMemberships(String customerPhone) {
-    final cleanTargetPhone = customerPhone.replaceAll(RegExp(r'\D'), '');
-    return _firestore.collection('memberships').snapshots().map((snapshot) {
-      final List<Map<String, dynamic>> list = [];
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final docPhone = (data['customerPhone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
-        if (cleanTargetPhone.isNotEmpty && (docPhone.contains(cleanTargetPhone) || cleanTargetPhone.contains(docPhone))) {
-          list.add({'id': doc.id, ...data});
-        }
-      }
-      return list;
-    });
-  }
-
-  String _getMonthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[month - 1];
-  }
-
-  /// Stream customer's bookings in real-time
-  Stream<List<Map<String, dynamic>>> streamCustomerBookings(String customerPhone) {
-    return _firestore
-        .collection('bookings')
-        .snapshots()
-        .map((snapshot) {
-      final List<Map<String, dynamic>> list = [];
-      final cleanTargetPhone = customerPhone.replaceAll(RegExp(r'\D'), '');
-
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final docPhone = (data['customerPhone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
-
-        if (cleanTargetPhone.isEmpty || docPhone.contains(cleanTargetPhone) || cleanTargetPhone.contains(docPhone)) {
-          list.add({
-            'id': doc.id,
-            ...data,
-          });
-        }
-      }
-
-      list.sort((a, b) => (b['id'] ?? '').toString().compareTo((a['id'] ?? '').toString()));
-      return list;
-    });
-  }
-
-  /// Stream partner's bookings in real-time
-  Stream<List<Map<String, dynamic>>> streamPartnerBookings(String salonId) {
-    return _firestore
-        .collection('bookings')
-        .where('salonId', isEqualTo: salonId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return {
-          'id': doc.id,
-          ...doc.data(),
-        };
-      }).toList();
-    });
+    } catch (e) {
+      print('Error fetching booking: $e');
+      return null;
+    }
   }
 
   /// Cancel booking
-  Future<void> cancelBooking(String bookingId, {String? cancelledBy, String? reason}) async {
-    await _firestore.collection('bookings').doc(bookingId).update({
-      'status': 'cancelled',
-      'cancelledAt': FieldValue.serverTimestamp(),
-      'cancelledBy': cancelledBy ?? 'customer',
-      'cancellationReason': reason ?? '',
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+  Future<bool> cancelBooking(
+    String bookingId, {
+    String? cancelledBy,
+    String? reason,
+  }) async {
+    try {
+      final response = await _api.patch('/bookings/$bookingId/status', {
+        'status': 'cancelled',
+        'cancelReason': reason ?? '',
+      });
+      
+      return response['success'] == true;
+    } catch (e) {
+      print('Error cancelling booking: $e');
+      return false;
+    }
   }
 
   /// Complete booking (partner only)
-  Future<void> completeBooking(String bookingId) async {
-    await _firestore.collection('bookings').doc(bookingId).update({
-      'status': 'completed',
-      'completedAt': FieldValue.serverTimestamp(),
-      'completedBy': 'partner',
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+  Future<bool> completeBooking(String bookingId) async {
+    try {
+      final response = await _api.patch('/bookings/$bookingId/status', {
+        'status': 'completed',
+      });
+      
+      return response['success'] == true;
+    } catch (e) {
+      print('Error completing booking: $e');
+      return false;
+    }
   }
 
-  /// Mark booking as viewed by partner
-  Future<void> markBookingViewed(String bookingId) async {
-    await _firestore.collection('bookings').doc(bookingId).update({
-      'viewedByPartner': true,
-    });
+  /// Update booking status
+  Future<bool> updateBookingStatus(
+    String bookingId, 
+    String status, {
+    String? reason,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'status': status,
+      };
+      
+      if (reason != null) {
+        payload['cancelReason'] = reason;
+      }
+
+      final response = await _api.patch('/bookings/$bookingId/status', payload);
+      
+      return response['success'] == true;
+    } catch (e) {
+      print('Error updating booking status: $e');
+      return false;
+    }
+  }
+
+  /// Get memberships for a partner
+  Future<List<Map<String, dynamic>>> getPartnerMemberships(String partnerId) async {
+    try {
+      final response = await _api.get('/memberships?partnerId=$partnerId');
+      
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data'] ?? [];
+        return data.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching memberships: $e');
+      return [];
+    }
+  }
+
+  /// Get customers who have booked with this partner
+  Future<List<Map<String, dynamic>>> getPartnerCustomers(String partnerId) async {
+    try {
+      // Get all bookings for this partner
+      final bookings = await getPartnerBookings(partnerId);
+      
+      // Extract unique customers
+      final Map<String, Map<String, dynamic>> uniqueCustomers = {};
+      
+      for (var booking in bookings) {
+        final phone = booking['customerPhone'] as String?;
+        if (phone != null && !uniqueCustomers.containsKey(phone)) {
+          uniqueCustomers[phone] = {
+            'phone': phone,
+            'name': booking['customerName'] ?? 'Customer',
+            'lastVisit': booking['bookingDate'] ?? '',
+            'totalBookings': 1,
+          };
+        } else if (phone != null) {
+          uniqueCustomers[phone]!['totalBookings'] = 
+            (uniqueCustomers[phone]!['totalBookings'] as int) + 1;
+        }
+      }
+      
+      return uniqueCustomers.values.toList();
+    } catch (e) {
+      print('Error fetching partner customers: $e');
+      return [];
+    }
   }
 }

@@ -6,7 +6,7 @@ export const deletePartner = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    await prisma.partner.delete({ where: { id } });
+    await prisma.partner.delete({ where: { id: id as string } });
 
     return responseHandler.success(res, null, 'Partner deleted successfully');
   } catch (error) {

@@ -5,3 +5,5 @@ export * from './updatePartner';
 export * from './deletePartner';
 export * from './updatePartnerStatus';
 export * from './checkPhone';
+export * from './getEarnings';
+export * from './updatePayoutDetails';

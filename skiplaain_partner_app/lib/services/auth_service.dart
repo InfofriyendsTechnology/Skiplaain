@@ -1,26 +1,23 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'api_service.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  User? get currentUser => _auth.currentUser;
+  final ApiService _api = ApiService();
 
   /// Check if phone number already registered as partner
   Future<bool> isPhoneNumberRegistered(String phoneNumber) async {
     try {
-      final cleanPhone = phoneNumber.trim().replaceAll(RegExp(r'\D'), '');
-      final partnerId = 'partner_$cleanPhone';
+      final response = await _api.post('/partners/check-phone', {
+        'phone': phoneNumber,
+      });
       
-      final doc = await _firestore.collection('partners').doc(partnerId).get();
-      return doc.exists;
+      return response['exists'] == true;
     } catch (e) {
+      print('Error checking phone registration: $e');
       return false;
     }
   }
 
-  /// Send OTP to the given phone number (Testing mode: 111111 for ALL numbers)
+  /// Send OTP to the given phone number via API
   Future<void> sendOTP({
     required String phoneNumber,
     required Function() onSuccess,
@@ -28,38 +25,71 @@ class AuthService {
   }) async {
     try {
       final cleanPhone = phoneNumber.trim().replaceAll(RegExp(r'\D'), '');
+      
       if (cleanPhone.length < 10) {
         onError("Please enter a valid 10-digit mobile number.");
         return;
       }
 
-      print("Testing Mode: OTP for $phoneNumber is 111111");
-      // Simulate quick network response
-      await Future.delayed(const Duration(milliseconds: 600));
-      onSuccess();
+      final response = await _api.post('/auth/send-otp', {
+        'phone': phoneNumber,
+        'purpose': 'login',
+      });
+
+      if (response['success'] == true) {
+        print("OTP sent successfully to $phoneNumber");
+        onSuccess();
+      } else {
+        onError(response['message'] ?? 'Failed to send OTP');
+      }
     } catch (e) {
-      onError(e.toString());
+      print('Error sending OTP: $e');
+      onError('Network error. Please try again.');
     }
   }
 
-  /// Verify the OTP entered by the user (Universal OTP: 111111)
+  /// Verify the OTP entered by the user via API
   Future<void> verifyOTP({
+    required String phoneNumber,
     required String otp,
-    required Function() onSuccess,
+    required Function(String token, Map<String, dynamic>? userData) onSuccess,
     required Function(String error) onError,
   }) async {
     try {
       final cleanOtp = otp.trim();
 
-      if (cleanOtp == "111111") {
-        print("Testing Mode: Verified universal OTP 111111 successfully.");
-        await Future.delayed(const Duration(milliseconds: 500));
-        onSuccess();
+      final response = await _api.post('/auth/verify-otp', {
+        'phone': phoneNumber,
+        'otp': cleanOtp,
+        'userType': 'partner',
+      });
+
+      if (response['success'] == true) {
+        final token = response['data']?['token'] ?? '';
+        final userData = response['data']?['partner'];
+        
+        // Save token
+        if (token.isNotEmpty) {
+          await _api.saveToken(token);
+        }
+        
+        print("OTP verified successfully");
+        onSuccess(token, userData);
       } else {
-        onError("Invalid OTP. Please enter 111111 for testing.");
+        onError(response['message'] ?? 'Invalid OTP');
       }
     } catch (e) {
-      onError("Verification failed. Please try again.");
+      print('Error verifying OTP: $e');
+      onError('Verification failed. Please try again.');
+    }
+  }
+
+  /// Logout - clear token
+  Future<void> logout() async {
+    try {
+      await _api.clearToken();
+    } catch (e) {
+      print('Error during logout: $e');
     }
   }
 }

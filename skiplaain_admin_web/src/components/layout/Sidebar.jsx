@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { FiGrid, FiUsers, FiUserCheck, FiCalendar, FiSettings, FiLogOut } from 'react-icons/fi';
+import { FiGrid, FiUsers, FiUserCheck, FiCalendar, FiSettings, FiLogOut, FiDollarSign } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './Sidebar.scss';
 
@@ -8,6 +8,7 @@ const navItems = [
   { path: '/partners', label: 'Partners', icon: <FiUsers /> },
   { path: '/customers', label: 'Customers', icon: <FiUserCheck /> },
   { path: '/bookings', label: 'Bookings', icon: <FiCalendar /> },
+  { path: '/payouts', label: 'Payouts', icon: <FiDollarSign /> },
   { path: '/settings', label: 'Settings', icon: <FiSettings /> },
 ];
 

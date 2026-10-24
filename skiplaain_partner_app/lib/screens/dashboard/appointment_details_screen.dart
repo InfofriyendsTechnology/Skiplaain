@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/booking_service.dart';
 import '../../widgets/status_badge.dart';
 import '../../utils/popup_utils.dart';
@@ -28,12 +27,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   Future<void> _markAsViewed() async {
-    final bookingId = widget.appointmentData['bookingId'] ?? widget.appointmentData['id'];
-    if (bookingId != null) {
-      try {
-        await _bookingService.markBookingViewed(bookingId);
-      } catch (_) {}
-    }
+    // Mark booking as viewed via API if needed
+    // This functionality can be added to the API later
   }
 
   Future<void> _completeAppointment() async {
@@ -126,53 +121,43 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bookingId = widget.appointmentData['bookingId'] ?? widget.appointmentData['id'];
-    
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('bookings')
-          .doc(bookingId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        final data = snapshot.hasData && snapshot.data!.exists
-            ? snapshot.data!.data() as Map<String, dynamic>
-            : widget.appointmentData;
+    final data = widget.appointmentData;
 
-        final customerName = data['customerName'] ?? 'Unknown Customer';
-        final customerPhone = data['customerPhone'] ?? '';
-        final service = data['service'] ?? 'Unknown Service';
-        final timeSlot = data['timeSlot'] ?? data['time'] ?? 'Unknown Time';
-        final bookingDate = data['bookingDate'] ?? '';
-        final price = data['price'] ?? '₹0';
-        final status = data['status'] ?? 'confirmed';
-        final barberName = data['barberName'] ?? 'Any Available Barber';
-        final services = data['services'] as List<dynamic>? ?? [];
-        final specialInstructions = data['specialInstructions'] ?? '';
+    final customerName = data['customerName'] ?? 'Unknown Customer';
+    final customerPhone = data['customerPhone'] ?? '';
+    final service = data['service'] ?? 'Unknown Service';
+    final timeSlot = data['timeSlot'] ?? data['time'] ?? 'Unknown Time';
+    final bookingDate = data['bookingDate'] ?? '';
+    final price = data['price'] ?? '₹${data['totalAmount'] ?? 0}';
+    final status = data['status'] ?? 'confirmed';
+    final barberName = data['barberName'] ?? 'Any Available Barber';
+    final services = data['services'] as List<dynamic>? ?? [];
+    final specialInstructions = data['specialInstructions'] ?? '';
 
-        final isCompleted = status == 'completed';
-        final isCancelled = status == 'cancelled';
-        final canTakeAction = !isCompleted && !isCancelled;
+    final isCompleted = status == 'completed';
+    final isCancelled = status == 'cancelled';
+    final canTakeAction = !isCompleted && !isCancelled;
 
-        return Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: const Color(0xFF1A1A1A),
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: const Text(
-              'Appointment Details',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            centerTitle: true,
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1A1A1A),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Appointment Details',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
           ),
-          body: SafeArea(
+        ),
+        centerTitle: true,
+      ),
+      body: SafeArea(
             child: SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
@@ -201,7 +186,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         border: Border.all(color: const Color(0xFF2A2A2A)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withValues(alpha: 0.3),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -221,7 +206,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF00FF00).withOpacity(0.3),
+                                      color: const Color(0xFF00FF00).withValues(alpha: 0.3),
                                       blurRadius: 12,
                                       spreadRadius: 2,
                                     ),
@@ -259,7 +244,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                         Text(
                                           customerPhone,
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(0.7),
+                                            color: Colors.white.withValues(alpha: 0.7),
                                             fontSize: 15,
                                           ),
                                         ),
@@ -397,7 +382,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         Text(
                           specialInstructions,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                             fontSize: 15,
                             height: 1.5,
                           ),
@@ -418,11 +403,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               label: const Text('Cancel'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.red,
-                                disabledForegroundColor: Colors.red.withOpacity(0.3),
+                                disabledForegroundColor: Colors.red.withValues(alpha: 0.3),
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 side: BorderSide(
                                   color: _isProcessing
-                                      ? Colors.red.withOpacity(0.3)
+                                      ? Colors.red.withValues(alpha: 0.3)
                                       : Colors.red,
                                   width: 2,
                                 ),
@@ -451,11 +436,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF00FF00),
                                 foregroundColor: Colors.black,
-                                disabledBackgroundColor: const Color(0xFF00FF00).withOpacity(0.3),
-                                disabledForegroundColor: Colors.black.withOpacity(0.3),
+                                disabledBackgroundColor: const Color(0xFF00FF00).withValues(alpha: 0.3),
+                                disabledForegroundColor: Colors.black.withValues(alpha: 0.3),
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 elevation: 4,
-                                shadowColor: const Color(0xFF00FF00).withOpacity(0.4),
+                                shadowColor: const Color(0xFF00FF00).withValues(alpha: 0.4),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -512,7 +497,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 14,
             ),
           ),

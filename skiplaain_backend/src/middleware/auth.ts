@@ -28,7 +28,7 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 };
 
-// Optional: Role-based middleware
+// Role-based middleware
 export const requireRole = (roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user || !roles.includes(req.user.type)) {
@@ -36,4 +36,34 @@ export const requireRole = (roles: string[]) => {
     }
     next();
   };
+};
+
+// Owner or admin middleware for partner routes
+export const requireOwnerOrAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return responseHandler.unauthorized(res, 'Authentication required');
+  }
+
+  // Admin can access any partner
+  if (req.user.type === 'admin') {
+    return next();
+  }
+
+  // Partner can only access their own data
+  if (req.user.type === 'partner') {
+    const targetPartnerId = req.params.id || req.params.partnerId;
+    
+    // For /partner/* routes, use the JWT id directly
+    if (req.path.startsWith('/partner') || !targetPartnerId) {
+      return next();
+    }
+    
+    // For /partners/:id routes, check ownership
+    if (targetPartnerId !== req.user.id) {
+      return responseHandler.forbidden(res, 'Access denied: you can only access your own data');
+    }
+    return next();
+  }
+
+  return responseHandler.forbidden(res, 'Insufficient permissions');
 };

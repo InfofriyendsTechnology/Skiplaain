@@ -206,7 +206,7 @@ class _MapboxLocationPickerState extends State<MapboxLocationPicker> {
               color: const Color(0xFF00FF00),
               shadows: [
                 Shadow(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   blurRadius: 10,
                 ),
               ],
@@ -226,7 +226,7 @@ class _MapboxLocationPickerState extends State<MapboxLocationPicker> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withValues(alpha: 0.3),
                         blurRadius: 10,
                       ),
                     ],
@@ -267,7 +267,7 @@ class _MapboxLocationPickerState extends State<MapboxLocationPicker> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           blurRadius: 10,
                         ),
                       ],
@@ -331,7 +331,7 @@ class _MapboxLocationPickerState extends State<MapboxLocationPicker> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.5),
                     blurRadius: 20,
                   ),
                 ],
@@ -345,7 +345,7 @@ class _MapboxLocationPickerState extends State<MapboxLocationPicker> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00FF00).withOpacity(0.15),
+                          color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(Icons.location_on, color: Color(0xFF00FF00), size: 20),

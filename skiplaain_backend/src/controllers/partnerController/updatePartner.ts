@@ -8,7 +8,7 @@ export const updatePartner = async (req: Request, res: Response) => {
     const updateData = req.body;
 
     const partner = await prisma.partner.update({
-      where: { id },
+      where: { id: id as string },
       data: updateData,
       include: {
         barbers: true,

@@ -64,7 +64,7 @@ class _BusinessHoursScreenState extends State<BusinessHoursScreen> {
                                   dayData['isOpen'] = val;
                                 });
                               },
-                              activeColor: Colors.black,
+                              activeThumbColor: Colors.black,
                               activeTrackColor: const Color(0xFF00FF00),
                               inactiveThumbColor: Colors.black,
                               inactiveTrackColor: Colors.grey,

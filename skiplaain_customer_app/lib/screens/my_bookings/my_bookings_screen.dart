@@ -177,7 +177,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => BookingDetailScreen(
-                            bookingData: b,
+                            bookingId: (b['bookingId'] ?? b['id'] ?? '').toString(),
                           ),
                         ),
                       );
@@ -269,11 +269,28 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Icon(
-                                Icons.arrow_forward_ios,
-                                color: Colors.white.withOpacity(0.3),
-                                size: 14,
-                              ),
+                              if (isConfirmed)
+                                TextButton.icon(
+                                  onPressed: () => _onCancelBooking(
+                                    (b['id'] ?? b['bookingId'] ?? '').toString(),
+                                  ),
+                                  icon: const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFEF4444)),
+                                  label: const Text(
+                                    'Cancel',
+                                    style: TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+                                  ),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    backgroundColor: const Color(0xFFEF4444).withValues(alpha: 0.08),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                )
+                              else
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  size: 14,
+                                ),
                             ],
                           ),
                         ],

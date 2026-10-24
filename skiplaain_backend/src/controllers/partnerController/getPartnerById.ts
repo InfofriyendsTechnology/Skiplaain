@@ -7,7 +7,7 @@ export const getPartnerById = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     const partner = await prisma.partner.findUnique({
-      where: { id },
+      where: { id: id as string },
       include: {
         barbers: true,
         services: {

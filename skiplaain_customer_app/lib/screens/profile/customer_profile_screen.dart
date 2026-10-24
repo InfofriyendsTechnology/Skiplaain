@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/api_auth_service.dart';
+import '../../services/api_customer_service.dart';
+import '../../services/api_subscription_service.dart';
 import '../../utils/popup_utils.dart';
 import '../../services/api_booking_service.dart';
 import '../booking/booking_ticket_screen.dart';
@@ -18,9 +20,51 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   final ApiService _apiService = ApiService();
   final ApiBookingService _bookingService = ApiBookingService();
   final ApiAuthService _authService = ApiAuthService();
+  final ApiCustomerService _customerService = ApiCustomerService();
+  final ApiSubscriptionService _subService = ApiSubscriptionService();
 
-  void _showEditNameDialog() {
-    final controller = TextEditingController(text: _authService.customerName);
+  Map<String, dynamic>? _profile;
+  List<Map<String, dynamic>> _subscriptions = [];
+  bool _loadingProfile = true;
+  bool _loadingSubscriptions = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileAndSubscriptions();
+  }
+
+  Future<void> _loadProfileAndSubscriptions() async {
+    // Load profile
+    try {
+      final profile = await _customerService.getMe();
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _loadingProfile = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingProfile = false);
+    }
+
+    // Load subscriptions
+    try {
+      final subs = await _subService.getMySubscriptions();
+      if (mounted) {
+        setState(() {
+          _subscriptions = subs;
+          _loadingSubscriptions = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingSubscriptions = false);
+    }
+  }
+
+  void _showEditDialog() {
+    final nameController = TextEditingController(text: _profile?['name'] ?? _authService.customerName);
+    final emailController = TextEditingController(text: _profile?['email'] ?? '');
 
     showDialog(
       context: context,
@@ -30,18 +74,45 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: Color(0xFF262626)),
         ),
-        title: const Text('Edit Full Name', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+        title: const Text('Edit Profile', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Enter your updated name:', style: TextStyle(color: Colors.white54, fontSize: 12)),
-            const SizedBox(height: 10),
+            const Text('Name', style: TextStyle(color: Colors.white54, fontSize: 12)),
+            const SizedBox(height: 6),
             TextField(
-              controller: controller,
+              controller: nameController,
               style: const TextStyle(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Your name',
+                hintStyle: const TextStyle(color: Colors.white30),
+                filled: true,
+                fillColor: const Color(0xFF1E1E1E),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF262626)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF262626)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF00FF00)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Email (optional)', style: TextStyle(color: Colors.white54, fontSize: 12)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: emailController,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                hintText: 'your@email.com',
                 hintStyle: const TextStyle(color: Colors.white30),
                 filled: true,
                 fillColor: const Color(0xFF1E1E1E),
@@ -69,19 +140,28 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final newName = controller.text.trim();
-              if (newName.isNotEmpty) {
-                await _authService.updateCustomerName(newName);
-                if (mounted) setState(() {});
+              final newName = nameController.text.trim();
+              final newEmail = emailController.text.trim();
+
+              try {
+                await _customerService.updateMe(name: newName, email: newEmail);
+                await _loadProfileAndSubscriptions();
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (mounted) {
+                  PopupUtils.showSuccessNotification(context, 'Profile updated');
+                }
+              } catch (e) {
+                if (mounted) {
+                  PopupUtils.showErrorNotification(context, 'Failed to update profile: $e');
+                }
               }
-              if (ctx.mounted) Navigator.of(ctx).pop();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF00FF00),
               foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Save Name'),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -121,9 +201,11 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isLoggedIn = _authService.isLoggedIn;
-    final customerName = _authService.customerName.isEmpty ? 'Guest Customer' : _authService.customerName;
-    final customerPhone = _authService.customerPhone;
-    final initial = customerName.isNotEmpty ? customerName[0].toUpperCase() : 'U';
+    final customerName = _profile?['name'] ?? _authService.customerName;
+    final displayName = customerName.isEmpty ? 'Guest Customer' : customerName;
+    final customerPhone = _profile?['phone'] ?? _authService.customerPhone;
+    final customerEmail = _profile?['email'] ?? '';
+    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
@@ -173,9 +255,15 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 1. PROFILE HEADER CARD
-                _buildProfileHeaderCard(customerName, customerPhone, initial, isLoggedIn),
+                _buildProfileHeaderCard(displayName, customerPhone, initial, isLoggedIn, customerEmail),
 
                 const SizedBox(height: 20),
+
+                // 2. MY SUBSCRIPTIONS SECTION
+                if (isLoggedIn) ...[
+                  _buildSubscriptionsSection(),
+                  const SizedBox(height: 20),
+                ],
 
                 if (!isLoggedIn)
                   _buildGuestLoginBanner()
@@ -309,8 +397,161 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     );
   }
 
+  // --- MY SUBSCRIPTIONS SECTION ---
+  Widget _buildSubscriptionsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.workspace_premium_rounded, color: Color(0xFF00FF00), size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'My VIP Subscriptions',
+                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+            if (_subscriptions.isNotEmpty)
+              Text(
+                '${_subscriptions.length}',
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_loadingSubscriptions)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: Color(0xFF00FF00), strokeWidth: 2),
+            ),
+          )
+        else if (_subscriptions.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF141414),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF262626)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.workspace_premium_outlined, color: Colors.white24, size: 32),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'No active subscriptions',
+                        style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Subscribe to salons for VIP benefits',
+                        style: TextStyle(color: Colors.white38, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ...(_subscriptions.map((sub) {
+            final salonName = sub['salonName']?.toString() ?? 'Salon';
+            final planName = sub['planName']?.toString() ?? 'VIP Plan';
+            final status = sub['status']?.toString() ?? 'active';
+            final expiresAtStr = sub['expiresAt']?.toString() ?? '';
+            
+            final isActive = status == 'active';
+            final expiresAt = expiresAtStr.isNotEmpty ? DateTime.tryParse(expiresAtStr) : null;
+            final isExpired = expiresAt != null && expiresAt.isBefore(DateTime.now());
+            
+            final expiryDisplay = expiresAt != null
+                ? '${expiresAt.day}/${expiresAt.month}/${expiresAt.year}'
+                : 'N/A';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF141414),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isActive && !isExpired
+                      ? const Color(0xFF00FF00).withOpacity(0.3)
+                      : const Color(0xFF262626),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.workspace_premium_rounded,
+                    color: isActive && !isExpired ? const Color(0xFF00FF00) : Colors.white24,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          salonName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          planName,
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Expires: $expiryDisplay',
+                          style: TextStyle(
+                            color: isActive && !isExpired ? const Color(0xFF00FF00) : Colors.red,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isActive && !isExpired
+                          ? const Color(0xFF00FF00).withOpacity(0.12)
+                          : Colors.red.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      isActive && !isExpired ? 'Active' : 'Expired',
+                      style: TextStyle(
+                        color: isActive && !isExpired ? const Color(0xFF00FF00) : Colors.red,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList()),
+      ],
+    );
+  }
+
   // --- PROFILE HEADER CARD ---
-  Widget _buildProfileHeaderCard(String name, String phone, String initial, bool isLoggedIn) {
+  Widget _buildProfileHeaderCard(String name, String phone, String initial, bool isLoggedIn, String email) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -319,7 +560,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         border: Border.all(color: const Color(0xFF262626)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00FF00).withOpacity(0.04),
+            color: const Color(0xFF00FF00).withValues(alpha: 0.04),
             blurRadius: 20,
             spreadRadius: 2,
           ),
@@ -342,7 +583,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF00FF00).withOpacity(0.3),
+                      color: const Color(0xFF00FF00).withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 3),
                     ),
@@ -378,7 +619,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                         if (isLoggedIn) ...[
                           const SizedBox(width: 6),
                           InkWell(
-                            onTap: _showEditNameDialog,
+                            onTap: _showEditDialog,
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
@@ -402,9 +643,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00FF00).withOpacity(0.15),
+                            color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -530,7 +771,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF141414),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isShopVip ? const Color(0xFF00FF00).withOpacity(0.4) : const Color(0xFF262626)),
+        border: Border.all(color: isShopVip ? const Color(0xFF00FF00).withValues(alpha: 0.4) : const Color(0xFF262626)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,9 +782,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: isShopVip ? const Color(0xFF00FF00).withOpacity(0.15) : const Color(0xFF1E1E1E),
+                  color: isShopVip ? const Color(0xFF00FF00).withValues(alpha: 0.15) : const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isShopVip ? const Color(0xFF00FF00).withOpacity(0.3) : const Color(0xFF333333)),
+                  border: Border.all(color: isShopVip ? const Color(0xFF00FF00).withValues(alpha: 0.3) : const Color(0xFF333333)),
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -654,14 +895,14 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.4)),
+        border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF00FF00).withOpacity(0.15),
+              color: const Color(0xFF00FF00).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF00FF00), size: 22),
@@ -845,7 +1086,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF162B16),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.4)),
+        border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.4)),
       ),
       child: Column(
         children: [
@@ -905,7 +1146,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
             leading: const Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
             title: const Text('Edit Customer Profile Name', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
             trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 12),
-            onTap: _showEditNameDialog,
+            onTap: _showEditDialog,
           ),
           if (_authService.isLoggedIn) ...[
             const Divider(color: Color(0xFF222222), height: 1),

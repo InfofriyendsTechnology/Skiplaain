@@ -12,6 +12,20 @@ export const verifyOtp = async (req: Request, res: Response) => {
       return responseHandler.badRequest(res, 'Phone and OTP are required');
     }
 
+    // ADMIN SECURITY: Admin login restricted to allowlist
+    if (userType === 'admin') {
+      const adminPhones = (process.env.ADMIN_PHONES || '').split(',').map(p => p.trim());
+      
+      if (!adminPhones.includes(phone)) {
+        return responseHandler.forbidden(res, 'Admin access not authorized for this phone number');
+      }
+
+      // Admin must never accept test OTP in production
+      if (process.env.NODE_ENV === 'production' && otp === '111111') {
+        return responseHandler.badRequest(res, 'Invalid OTP');
+      }
+    }
+
     // Verify OTP
     const isValid = await otpService.verifyOtp(phone, otp);
 
@@ -23,6 +37,26 @@ export const verifyOtp = async (req: Request, res: Response) => {
     let userData;
     let isNewUser = false;
     let needsOnboarding = false;
+
+    if (userType === 'admin') {
+      // Admin token (no database record, just JWT)
+      const token = jwtHelper.generateToken({
+        id: 'admin_' + phone,
+        phone: phone,
+        type: 'admin',
+        name: 'Admin'
+      });
+
+      return responseHandler.success(res, {
+        token,
+        user: {
+          id: 'admin_' + phone,
+          phone,
+          name: 'Admin',
+          type: 'admin'
+        }
+      }, 'Admin login successful');
+    }
 
     if (userType === 'customer') {
       // Find or create customer

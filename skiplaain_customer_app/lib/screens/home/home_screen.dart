@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../services/api_salon_service.dart';
-import '../../services/api_service.dart';
-import '../../services/api_booking_service.dart';
 import '../../services/api_auth_service.dart';
+import '../../services/api_subscription_service.dart';
 import '../../utils/popup_utils.dart';
 import '../auth/customer_onboarding_screen.dart';
 import '../booking/booking_confirmation_screen.dart';
 import '../my_bookings/my_bookings_screen.dart';
+import '../scanner/qr_scanner_screen.dart';
 import '../profile/customer_profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,9 +19,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   final ApiSalonService _salonService = ApiSalonService();
-  final ApiService _apiService = ApiService();
-  final ApiBookingService _bookingService = ApiBookingService();
   final ApiAuthService _authService = ApiAuthService();
+  final ApiSubscriptionService _subService = ApiSubscriptionService();
 
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
@@ -36,19 +35,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late Animation<double> _scanLineAnim;
 
   final Set<int> _selectedServiceIndices = {};
-  int _selectedPlanIndex = 2; // 0 = 3M (₹33), 1 = 6M (₹66), 2 = 12M (₹99)
+  int _selectedPlanIndex = 0;
   bool _isProcessingMembership = false;
-  
+
+  // Subscription state — loaded from API when salon is connected
+  List<Map<String, dynamic>> _plans = [];
+  Map<String, dynamic> _subscriptionStatus = {'hasActivePlan': false, 'plansEnabled': false};
+  bool _isLoadingSubscription = false;
+  String _loadedSubscriptionForSalonId = '';
+
   List<Map<String, dynamic>> _salons = [];
   List<Map<String, dynamic>> _filteredSalons = [];
   bool _isLoadingSalons = true;
-  List<String> _searchHistory = [];
-
-  final List<Map<String, dynamic>> _plans = [
-    {'name': '3 Months VIP', 'duration': 3, 'price': 33, 'perMonth': '₹11/mo', 'badge': 'STARTER'},
-    {'name': '6 Months VIP', 'duration': 6, 'price': 66, 'perMonth': '₹11/mo', 'badge': 'POPULAR'},
-    {'name': '12 Months VIP', 'duration': 12, 'price': 99, 'perMonth': '₹8.25/mo', 'badge': 'BEST VALUE'},
-  ];
+  final List<String> _searchHistory = [];
 
   final List<String> _popularCities = [
     'Surat',
@@ -80,9 +79,39 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   void _checkSession() async {
-    final token = await _apiService.getToken();
     await _authService.initSession();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      // If already connected to a salon, load its subscription data
+      final salon = _authService.connectedSalon;
+      if (salon != null) {
+        final salonId = (salon['id'] ?? '').toString();
+        if (salonId.isNotEmpty) _loadSubscriptionData(salonId);
+      }
+    }
+  }
+
+  Future<void> _loadSubscriptionData(String salonId) async {
+    if (salonId.isEmpty || salonId == _loadedSubscriptionForSalonId) return;
+    if (!mounted) return;
+    setState(() => _isLoadingSubscription = true);
+    try {
+      final results = await Future.wait([
+        _subService.getPlansForSalon(salonId),
+        _subService.getSubscriptionStatus(salonId),
+      ]);
+      if (mounted) {
+        setState(() {
+          _plans = results[0] as List<Map<String, dynamic>>;
+          _subscriptionStatus = results[1] as Map<String, dynamic>;
+          _selectedPlanIndex = 0;
+          _isLoadingSubscription = false;
+          _loadedSubscriptionForSalonId = salonId;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingSubscription = false);
+    }
   }
   
   Future<void> _loadSalons() async {
@@ -179,13 +208,53 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  void _onScanQR() async {
+    try {
+      final result = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const QRScannerScreen(),
+        ),
+      );
+
+      if (result != null && result is String) {
+        // Parse QR code result - expecting salon ID or skiplaain://salon/<id> URL
+        String salonId = result;
+        
+        if (result.startsWith('skiplaain://salon/')) {
+          salonId = result.substring('skiplaain://salon/'.length);
+        } else if (result.startsWith('http://') || result.startsWith('https://')) {
+          // Handle URL format if needed
+          final uri = Uri.tryParse(result);
+          if (uri != null && uri.pathSegments.isNotEmpty) {
+            salonId = uri.pathSegments.last;
+          }
+        }
+
+        // Load salon details
+        final salon = await _salonService.getSalonById(salonId);
+        if (salon != null && mounted) {
+          _onSalonSelected(salon);
+        } else if (mounted) {
+          PopupUtils.showErrorNotification(context, 'Salon not found or not available');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        PopupUtils.showErrorNotification(context, 'Failed to scan QR: $e');
+      }
+    }
+  }
+
   void _onSalonSelected(Map<String, dynamic> salon) async {
     if (_authService.isLoggedIn && _authService.customerName.isNotEmpty) {
       await _authService.connectSalon(salon);
+      final salonId = (salon['id'] ?? '').toString();
       if (mounted) {
         setState(() {
           _selectedServiceIndices.clear();
+          _loadedSubscriptionForSalonId = ''; // force reload for new salon
         });
+        if (salonId.isNotEmpty) _loadSubscriptionData(salonId);
       }
     } else {
       // Open dedicated 3-step onboarding: Phone -> OTP -> Name -> Salon Hub
@@ -247,7 +316,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 decoration: BoxDecoration(
                   color: const Color(0xFF162B16),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.4)),
+                  border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.4)),
                 ),
                 child: const Row(
                   children: [
@@ -286,7 +355,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       itemBuilder: (ctx, index) {
                         final s = saved[index];
                         final sId = (s['id'] ?? '').toString();
-                        final sName = (s['salonName'] ?? s['businessName'] ?? 'Salon').toString();
+                        final sName = (s['salonName'] ?? 'Salon').toString();
                         final sAddr = (s['address'] ?? s['location'] ?? 'Surat').toString();
                         final isCurrent = sId == currentId;
 
@@ -305,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF00FF00).withOpacity(0.15),
+                                color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               alignment: Alignment.center,
@@ -339,11 +408,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                 : const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF666666), size: 16),
                             onTap: () async {
                               await _authService.switchActiveSalon(s);
+                              final switchedId = (s['id'] ?? '').toString();
                               if (mounted) {
                                 Navigator.of(context).pop();
                                 setState(() {
                                   _selectedServiceIndices.clear();
+                                  _loadedSubscriptionForSalonId = '';
                                 });
+                                if (switchedId.isNotEmpty) _loadSubscriptionData(switchedId);
                               }
                             },
                           ),
@@ -389,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildConnectedSalonDashboard() {
     final salon = _authService.connectedSalon!;
     final salonId = (salon['id'] ?? 'salon_id').toString();
-    final salonName = (salon['salonName'] ?? salon['businessName'] ?? 'Salon').toString();
+    final salonName = (salon['salonName'] ?? 'Salon').toString();
     final address = (salon['address'] ?? salon['location'] ?? 'Surat, Gujarat').toString();
     final category = (salon['category'] ?? 'Unisex').toString();
     final openingTime = (salon['openingTime'] ?? '09:00 AM').toString();
@@ -438,7 +510,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 decoration: BoxDecoration(
                   color: const Color(0xFF141414),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.4)),
+                  border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   children: [
@@ -481,7 +553,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFF162B16),
-                border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.5), width: 1.2),
+                border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.5), width: 1.2),
               ),
               alignment: Alignment.center,
               child: Text(
@@ -574,9 +646,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             physics: const BouncingScrollPhysics(),
             child: Builder(
               builder: (context) {
-                // TODO: Fetch membership from API
-                final activeMembership = null;
-              final isVip = activeMembership != null && (activeMembership['status'] == 'active');
+                final isVip = _subscriptionStatus['hasActivePlan'] == true;
+                final plansEnabled = _subscriptionStatus['plansEnabled'] != false;
 
               return Column(
                 children: [
@@ -603,9 +674,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                       width: 48,
                                       height: 48,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF00FF00).withOpacity(0.12),
+                                        color: const Color(0xFF00FF00).withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.25)),
+                                        border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.25)),
                                       ),
                                       alignment: Alignment.center,
                                       child: Text(
@@ -672,10 +743,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           const SizedBox(height: 16),
 
                           // VIP Card
-                          if (!isVip)
+                          if (!plansEnabled)
+                            const SizedBox.shrink()
+                          else if (_isLoadingSubscription)
+                            const Center(child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: CircularProgressIndicator(color: Color(0xFF00FF00), strokeWidth: 2),
+                            ))
+                          else if (!isVip)
                             _buildUnsubscribedVipCard(salonId, salonName)
                           else
-                            _buildActiveVipCard(salonName, activeMembership),
+                            _buildActiveVipCard(salonName, _subscriptionStatus),
 
                           const SizedBox(height: 22),
 
@@ -882,7 +960,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       decoration: BoxDecoration(
         color: const Color(0xFF111A11),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.35), width: 1.2),
+        border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.35), width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -892,7 +970,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00FF00).withOpacity(0.15),
+                  color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF00FF00), size: 18),
@@ -914,93 +992,133 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
           const SizedBox(height: 16),
 
-          Row(
-            children: List.generate(_plans.length, (index) {
-              final plan = _plans[index];
-              final isSelected = _selectedPlanIndex == index;
+          if (_plans.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF141414),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF262626)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Colors.white38, size: 14),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'No subscription plans available yet.',
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            Row(
+              children: List.generate(_plans.length, (index) {
+                final plan = _plans[index];
+                final isSelected = _selectedPlanIndex == index;
+                final durationMonths = plan['durationMonths'] as int? ?? (plan['duration'] as int? ?? 1);
+                final pricePaise = plan['pricePaise'] as int? ?? ((plan['price'] as num?)?.toInt() ?? 0);
+                final priceRupees = (pricePaise / 100).toStringAsFixed(0);
+                final perMonth = durationMonths > 0
+                    ? '₹${(pricePaise / 100 / durationMonths).toStringAsFixed(0)}/mo'
+                    : '';
 
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: index < 2 ? 8 : 0),
-                  child: InkWell(
-                    onTap: () {
-                      if (mounted) {
-                        setState(() => _selectedPlanIndex = index);
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-                      decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFF00FF00) : const Color(0xFF141414),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isSelected ? const Color(0xFF00FF00) : const Color(0xFF262626),
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: index < _plans.length - 1 ? 8 : 0),
+                    child: InkWell(
+                      onTap: () => setState(() => _selectedPlanIndex = index),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF00FF00) : const Color(0xFF141414),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFF00FF00) : const Color(0xFF262626),
+                          ),
                         ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            '${plan['duration']} Months',
-                            style: TextStyle(
-                              color: isSelected ? Colors.black : Colors.white70,
-                              fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                        child: Column(
+                          children: [
+                            Text(
+                              '$durationMonths Mo',
+                              style: TextStyle(
+                                color: isSelected ? Colors.black : Colors.white70,
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '₹${plan['price']}',
-                            style: TextStyle(
-                              color: isSelected ? Colors.black : const Color(0xFF00FF00),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
+                            const SizedBox(height: 2),
+                            Text(
+                              '₹$priceRupees',
+                              style: TextStyle(
+                                color: isSelected ? Colors.black : const Color(0xFF00FF00),
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
-                          ),
-                          Text(
-                            plan['perMonth'] as String,
-                            style: TextStyle(
-                              color: isSelected ? Colors.black87 : Colors.white38,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
+                            Text(
+                              perMonth,
+                              style: TextStyle(
+                                color: isSelected ? Colors.black87 : Colors.white38,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            }),
-          ),
-
-          const SizedBox(height: 16),
-
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton(
-              onPressed: _isProcessingMembership ? null : () => _buyMembership(salonId, salonName),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00FF00),
-                foregroundColor: Colors.black,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
-              ),
-              child: _isProcessingMembership
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                  : Text('Join VIP for ₹${_plans[_selectedPlanIndex]['price']} (${_plans[_selectedPlanIndex]['duration']} Months)'),
+                );
+              }),
             ),
-          ),
+
+            const SizedBox(height: 16),
+
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: _isProcessingMembership ? null : () => _buyMembership(salonId, salonName),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00FF00),
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                ),
+                child: _isProcessingMembership
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                    : Builder(builder: (_) {
+                        final plan = _plans[_selectedPlanIndex];
+                        final pricePaise = plan['pricePaise'] as int? ?? ((plan['price'] as num?)?.toInt() ?? 0);
+                        final priceRupees = (pricePaise / 100).toStringAsFixed(0);
+                        final durationMonths = plan['durationMonths'] as int? ?? (plan['duration'] as int? ?? 1);
+                        return Text('Join VIP for ₹$priceRupees ($durationMonths Months)');
+                      }),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildActiveVipCard(String salonName, Map<String, dynamic> membership) {
-    final planName = (membership['planName'] ?? 'VIP Pass').toString();
-    final expiryDisplay = (membership['expiryDisplay'] ?? 'Active').toString();
+    final planName = (membership['planName'] ?? membership['name'] ?? 'VIP Pass').toString();
+    final expiresAtRaw = membership['expiresAt']?.toString() ?? '';
+    String expiryDisplay = 'Active';
+    if (expiresAtRaw.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(expiresAtRaw);
+        expiryDisplay = '${dt.day}/${dt.month}/${dt.year}';
+      } catch (_) {
+        expiryDisplay = expiresAtRaw;
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -1011,10 +1129,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.5), width: 1.4),
+        border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.5), width: 1.4),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00FF00).withOpacity(0.08),
+            color: const Color(0xFF00FF00).withValues(alpha: 0.08),
             blurRadius: 20,
             spreadRadius: 2,
           ),
@@ -1100,21 +1218,127 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   void _buyMembership(String salonId, String salonName) async {
     if (!mounted) return;
-    
+    if (_plans.isEmpty || _selectedPlanIndex >= _plans.length) return;
+
     final plan = _plans[_selectedPlanIndex];
+    final planId = plan['id']?.toString() ?? '';
+    final pricePaise = plan['pricePaise'] as int? ?? ((plan['price'] as num?)?.toInt() ?? 0);
+    final priceRupees = (pricePaise / 100).toStringAsFixed(0);
+    final durationMonths = plan['durationMonths'] as int? ?? (plan['duration'] as int? ?? 1);
+    final planName = plan['name']?.toString() ?? 'VIP Plan';
+
     setState(() => _isProcessingMembership = true);
 
     try {
-      await Future.delayed(const Duration(seconds: 1));
-      await _authService.activateSalonMembership(salonId, plan['name'] as String, plan['duration'] as int);
-
-      if (mounted) {
-        setState(() => _isProcessingMembership = false);
-      }
+      // Step 1: Create Razorpay order
+      final orderData = await _subService.createOrder(
+        planId: planId,
+        partnerId: salonId,
+      );
 
       if (!mounted) return;
+      setState(() => _isProcessingMembership = false);
 
-      // Show success dialog
+      final orderId = orderData['orderId']?.toString() ?? '';
+
+      // Step 2: Show payment confirmation dialog
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF141414),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Color(0xFF00FF00), width: 1),
+          ),
+          title: const Text('Confirm Payment', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Plan: $planName', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 6),
+              Text('Amount: ₹$priceRupees', style: const TextStyle(color: Color(0xFF00FF00), fontSize: 20, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text('Duration: $durationMonths month(s)', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF262626)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: Color(0xFF00FF00), size: 14),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Test mode: tap "Pay Now" to simulate payment',
+                        style: TextStyle(color: Colors.white38, fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                await _simulatePaymentVerification(orderId, planName, durationMonths, salonId, salonName);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF00),
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Pay Now', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessingMembership = false);
+        PopupUtils.showErrorNotification(context, 'Failed to initiate payment: $e');
+      }
+    }
+  }
+
+  Future<void> _simulatePaymentVerification(
+    String orderId, String planName, int durationMonths, String salonId, String salonName) async {
+    if (!mounted) return;
+    setState(() => _isProcessingMembership = true);
+    try {
+      final verifyResult = await _subService.verifyPayment(
+        orderId: orderId,
+        paymentId: 'pay_test_${DateTime.now().millisecondsSinceEpoch}',
+        signature: 'test_signature_skiplaain',
+      );
+
+      if (!mounted) return;
+      setState(() => _isProcessingMembership = false);
+
+      final membership = verifyResult['membership'] as Map<String, dynamic>? ?? {};
+      final expiresAt = membership['expiresAt']?.toString() ?? '';
+      String expiryDisplay = 'Active';
+      if (expiresAt.isNotEmpty) {
+        try {
+          final dt = DateTime.parse(expiresAt);
+          expiryDisplay = '${dt.day}/${dt.month}/${dt.year}';
+        } catch (_) {}
+      }
+
+      // Refresh subscription status
+      setState(() => _loadedSubscriptionForSalonId = '');
+      await _loadSubscriptionData(salonId);
+
       if (!mounted) return;
       showDialog(
         context: context,
@@ -1133,20 +1357,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00FF00).withOpacity(0.15),
+                  color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF00FF00), width: 2),
                 ),
-                child: const Icon(Icons.check_circle_outline, color: Color(0xFF00FF00), size: 32),
+                child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF00FF00), size: 32),
               ),
               const SizedBox(height: 16),
               Text(
-                '${plan['name']} Activated!',
+                '$planName Activated!',
                 style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                'You now have VIP access at $salonName',
+                'VIP access at $salonName\nValid until $expiryDisplay',
                 style: const TextStyle(color: Colors.white60, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
@@ -1160,18 +1385,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Awesome!'),
+                  child: const Text('Start Using VIP Pass', style: TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ),
             ],
           ),
         ),
       );
-
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessingMembership = false);
-        PopupUtils.showErrorNotification(context, 'Failed to activate VIP: $e');
+        PopupUtils.showErrorNotification(
+          context,
+          'Payment simulation: $e\n(Real Razorpay integration requires live keys)',
+        );
       }
     }
   }
@@ -1195,7 +1422,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: const Color(0xFF00FF00).withOpacity(0.15),
+              color: const Color(0xFF00FF00).withValues(alpha: 0.15),
               shape: BoxShape.circle,
               border: Border.all(color: const Color(0xFF00FF00), width: 2),
             ),
@@ -1352,7 +1579,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     color: const Color(0xFF141414),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: _authService.isLoggedIn ? const Color(0xFF00FF00).withOpacity(0.5) : const Color(0xFF262626),
+                                      color: _authService.isLoggedIn ? const Color(0xFF00FF00).withValues(alpha: 0.5) : const Color(0xFF262626),
                                       width: 1.2,
                                     ),
                                   ),
@@ -1485,7 +1712,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     decoration: BoxDecoration(
                       color: const Color(0xFF162B16),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.3)),
                     ),
                     child: const Row(
                       children: [
@@ -1577,7 +1804,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF00FF00).withOpacity(0.25),
+                      color: const Color(0xFF00FF00).withValues(alpha: 0.25),
                       blurRadius: 12,
                       offset: const Offset(0, 2),
                     ),
@@ -1626,11 +1853,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         const SizedBox(height: 28),
 
         InkWell(
-          onTap: () {
-            if (salons.isNotEmpty) {
-              _onSalonSelected(salons.first);
-            }
-          },
+          onTap: _onScanQR,
           borderRadius: BorderRadius.circular(32),
           child: Center(
             child: Container(
@@ -1776,12 +1999,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             color: const Color(0xFF141414),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: _searchQuery.isNotEmpty ? const Color(0xFF00FF00).withOpacity(0.3) : const Color(0xFF262626),
+              color: _searchQuery.isNotEmpty ? const Color(0xFF00FF00).withValues(alpha: 0.3) : const Color(0xFF262626),
             ),
             boxShadow: _searchQuery.isNotEmpty
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF00FF00).withOpacity(0.1),
+                      color: const Color(0xFF00FF00).withValues(alpha: 0.1),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     )
@@ -2017,7 +2240,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildSalonCard(Map<String, dynamic> salon, int index) {
-    final name = (salon['salonName'] ?? salon['businessName'] ?? 'Salon').toString();
+    final name = (salon['salonName'] ?? 'Salon').toString();
     final address = (salon['address'] ?? salon['location'] ?? _selectedCity).toString();
     final category = (salon['category'] ?? 'Unisex').toString();
     final rating = (salon['rating'] ?? 4.5).toString();
@@ -2044,11 +2267,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           color: const Color(0xFF141414),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: nameMatch ? const Color(0xFF00FF00).withOpacity(0.3) : const Color(0xFF242424),
+            color: nameMatch ? const Color(0xFF00FF00).withValues(alpha: 0.3) : const Color(0xFF242424),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -2070,14 +2293,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF00FF00).withOpacity(0.2),
-                          const Color(0xFF00FF00).withOpacity(0.05),
+                          const Color(0xFF00FF00).withValues(alpha: 0.2),
+                          const Color(0xFF00FF00).withValues(alpha: 0.05),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.3)),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -2114,7 +2337,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF00FF00).withOpacity(0.15),
+                                  color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: const Text(
@@ -2185,7 +2408,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00FF00).withOpacity(0.1),
+                      color: const Color(0xFF00FF00).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(

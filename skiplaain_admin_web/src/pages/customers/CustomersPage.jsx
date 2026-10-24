@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { FiUsers, FiSearch, FiRepeat, FiAward, FiDollarSign, FiClock, FiX, FiTrash2 } from 'react-icons/fi';
 import Navbar from '../../components/layout/Navbar';
 import StatCard from '../../components/common/StatCard';
-import { onCustomersSnapshot, onBookingsSnapshot, onMembershipsSnapshot, clearAllCustomers } from '../../services/firebaseService';
+import { onCustomersSnapshot, onBookingsSnapshot, onMembershipsSnapshot, clearAllCustomers } from '../../services/apiService';
 import toast from 'react-hot-toast';
 import './CustomersPage.scss';
 

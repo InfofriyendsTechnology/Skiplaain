@@ -167,10 +167,10 @@ class _CustomerOnboardingScreenState extends State<CustomerOnboardingScreen> {
     });
 
     try {
-      // Save profile locally
+      // Save profile locally first
       await _authService.setCustomerProfile(name, fullPhone);
       
-      // Ensure salon has required fields with fallbacks
+      // Ensure salon has required fields
       final safeSalon = {
         'id': widget.salon['id'] ?? '',
         'salonName': _salonName,
@@ -178,22 +178,15 @@ class _CustomerOnboardingScreenState extends State<CustomerOnboardingScreen> {
         'phone': widget.salon['phone'] ?? '',
         'ownerName': widget.salon['ownerName'] ?? '',
         'city': widget.salon['city'] ?? '',
-        ...widget.salon, // Merge all other fields
+        ...widget.salon,
       };
       
-      // Connect to salon
+      // Connect to salon locally
       await _authService.connectSalon(safeSalon);
-
-      // Register in cloud (Firebase for real-time features)
-      await _authService.registerCustomerInCloud(
-        name: name,
-        phone: fullPhone,
-        salon: safeSalon,
-      );
 
       if (!mounted) return;
 
-      // Success - go to home
+      // Success - go to home immediately
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
@@ -202,7 +195,7 @@ class _CustomerOnboardingScreenState extends State<CustomerOnboardingScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Registration failed: $e';
+          _errorMessage = 'Failed to save profile: ${e.toString()}';
         });
       }
     }
@@ -269,7 +262,7 @@ class _CustomerOnboardingScreenState extends State<CustomerOnboardingScreen> {
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00FF00).withOpacity(0.12),
+                            color: const Color(0xFF00FF00).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           alignment: Alignment.center,
@@ -298,7 +291,7 @@ class _CustomerOnboardingScreenState extends State<CustomerOnboardingScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00FF00).withOpacity(0.15),
+                            color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -448,14 +441,14 @@ class _CustomerOnboardingScreenState extends State<CustomerOnboardingScreen> {
                                       color: isFocused
                                           ? const Color(0xFF00FF00)
                                           : (isFilled
-                                              ? const Color(0xFF00FF00).withOpacity(0.6)
+                                              ? const Color(0xFF00FF00).withValues(alpha: 0.6)
                                               : const Color(0xFF262626)),
                                       width: isFocused ? 2 : 1.2,
                                     ),
                                     boxShadow: isFocused
                                         ? [
                                             BoxShadow(
-                                              color: const Color(0xFF00FF00).withOpacity(0.2),
+                                              color: const Color(0xFF00FF00).withValues(alpha: 0.2),
                                               blurRadius: 8,
                                             ),
                                           ]
@@ -624,9 +617,9 @@ class _CustomerOnboardingScreenState extends State<CustomerOnboardingScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444).withOpacity(0.12),
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                        border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [

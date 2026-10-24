@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiSearch, FiEye, FiCheck, FiXCircle, FiUsers, FiTrash2, FiCalendar } from 'react-icons/fi';
+import { FiSearch, FiEye, FiCheck, FiXCircle, FiUsers, FiTrash2, FiCalendar, FiPercent, FiCreditCard, FiSave } from 'react-icons/fi';
 import Navbar from '../../components/layout/Navbar';
 import { 
   onPartnersSnapshot, 
   updatePartnerStatus, 
-  deletePartnerBarber, 
-  clearSalonBarbers, 
-  deletePartner 
-} from '../../services/firebaseService';
+  deletePartner,
+  deleteBarber,
+  clearAllBarbers,
+  updatePartnerCommission,
+  updatePartnerPlansEnabled
+} from '../../services/apiService';
 import toast from 'react-hot-toast';
 import './PartnersPage.scss';
 
@@ -18,6 +20,10 @@ const PartnersPage = () => {
   const [filter, setFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPartner, setSelectedPartner] = useState(null);
+  const [editingCommission, setEditingCommission] = useState(false);
+  const [commissionValue, setCommissionValue] = useState('');
+  const [savingCommission, setSavingCommission] = useState(false);
+  const [togglingPlans, setTogglingPlans] = useState(false);
   const { onMenuClick } = useOutletContext() || {};
 
   useEffect(() => {
@@ -45,11 +51,8 @@ const PartnersPage = () => {
     if (!window.confirm(`Are you sure you want to delete barber "${barberName}"?`)) return;
 
     try {
-      const updated = await deletePartnerBarber(partnerId, barberId);
+      await deleteBarber(partnerId, barberId);
       toast.success(`Barber "${barberName}" deleted successfully!`);
-      if (selectedPartner) {
-        setSelectedPartner(prev => ({ ...prev, barbers: updated }));
-      }
     } catch (err) {
       toast.error('Failed to delete barber: ' + err.message);
     }
@@ -59,11 +62,8 @@ const PartnersPage = () => {
     if (!window.confirm(`Are you sure you want to remove ALL barbers from "${salonName}"?`)) return;
 
     try {
-      await clearSalonBarbers(partnerId);
+      await clearAllBarbers(partnerId);
       toast.success(`All barbers cleared for "${salonName}"!`);
-      if (selectedPartner) {
-        setSelectedPartner(prev => ({ ...prev, barbers: [] }));
-      }
     } catch (err) {
       toast.error('Failed to clear barbers');
     }
@@ -78,6 +78,44 @@ const PartnersPage = () => {
       setSelectedPartner(null);
     } catch (err) {
       toast.error('Failed to delete salon: ' + err.message);
+    }
+  };
+
+  const handleSaveCommission = async () => {
+    if (!selectedPartner) return;
+    
+    // Validate: empty string means null (use platform default), otherwise must be 0-100
+    const trimmed = commissionValue.trim();
+    if (trimmed !== '' && (isNaN(trimmed) || parseFloat(trimmed) < 0 || parseFloat(trimmed) > 100)) {
+      toast.error('Commission must be between 0 and 100, or empty for platform default');
+      return;
+    }
+
+    setSavingCommission(true);
+    try {
+      const payload = trimmed === '' ? null : parseFloat(trimmed);
+      await updatePartnerCommission(selectedPartner.id, payload);
+      toast.success('Commission updated successfully!');
+      setEditingCommission(false);
+    } catch (err) {
+      toast.error('Failed to update commission: ' + err.message);
+    } finally {
+      setSavingCommission(false);
+    }
+  };
+
+  const handleTogglePlansEnabled = async () => {
+    if (!selectedPartner) return;
+    
+    setTogglingPlans(true);
+    try {
+      const newValue = !selectedPartner.plans_enabled;
+      await updatePartnerPlansEnabled(selectedPartner.id, newValue);
+      toast.success(`Subscription plans ${newValue ? 'enabled' : 'disabled'} for this salon`);
+    } catch (err) {
+      toast.error('Failed to toggle plans: ' + err.message);
+    } finally {
+      setTogglingPlans(false);
     }
   };
 
@@ -209,6 +247,130 @@ const PartnersPage = () => {
                 <div className="detail-item"><label>Closing Time</label><span>{selectedPartner.closingTime || '—'}</span></div>
                 <div className="detail-item"><label>Weekly Off</label><span>{selectedPartner.weeklyOff || '—'}</span></div>
                 <div className="detail-item"><label>Total Bookings</label><span>{selectedPartner.totalAppointments || 0}</span></div>
+              </div>
+
+              {/* COMMISSION OVERRIDE SECTION */}
+              <div style={{ marginTop: 22, borderTop: '1px solid #222', paddingTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', color: '#00ff00', letterSpacing: '0.8px', fontWeight: 700 }}>
+                    <FiPercent size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                    Commission Settings
+                  </label>
+                  {!editingCommission && (
+                    <button 
+                      className="btn btn-ghost btn-sm" 
+                      style={{ fontSize: 11, padding: '4px 10px' }}
+                      onClick={() => {
+                        setEditingCommission(true);
+                        setCommissionValue(selectedPartner.custom_commission_percent == null ? '' : selectedPartner.custom_commission_percent.toString());
+                      }}
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+
+                {editingCommission ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Leave empty for platform default"
+                      value={commissionValue}
+                      onChange={(e) => setCommissionValue(e.target.value)}
+                      style={{ flex: 1, fontSize: 13 }}
+                    />
+                    <button 
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSaveCommission}
+                      disabled={savingCommission}
+                    >
+                      <FiSave /> {savingCommission ? 'Saving...' : 'Save'}
+                    </button>
+                    <button 
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setEditingCommission(false)}
+                      disabled={savingCommission}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 13, color: '#fff' }}>
+                      <strong>Commission Rate: </strong>
+                      {selectedPartner.custom_commission_percent == null ? (
+                        <span style={{ color: '#888' }}>Using Platform Default</span>
+                      ) : (
+                        <span style={{ color: '#00ff00' }}>{selectedPartner.custom_commission_percent}%</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SUBSCRIPTION PLANS TOGGLE */}
+              <div style={{ marginTop: 16, borderTop: '1px solid #222', paddingTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', color: '#00ff00', letterSpacing: '0.8px', fontWeight: 700 }}>
+                    Subscription Plans for This Salon
+                  </label>
+                  <button 
+                    className={`btn btn-sm ${selectedPartner.plans_enabled ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={handleTogglePlansEnabled}
+                    disabled={togglingPlans}
+                    style={{ fontSize: 11, padding: '4px 12px' }}
+                  >
+                    {togglingPlans ? 'Updating...' : (selectedPartner.plans_enabled ? 'Enabled ✓' : 'Disabled')}
+                  </button>
+                </div>
+                <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+                  {selectedPartner.plans_enabled 
+                    ? 'Customers can purchase subscription plans at this salon.' 
+                    : 'Subscription plans are disabled for this salon.'}
+                </div>
+              </div>
+
+              {/* PAYOUT DETAILS SECTION */}
+              <div style={{ marginTop: 16, borderTop: '1px solid #222', paddingTop: 16 }}>
+                <label style={{ fontSize: 11, textTransform: 'uppercase', color: '#00ff00', letterSpacing: '0.8px', fontWeight: 700, marginBottom: 12, display: 'block' }}>
+                  <FiCreditCard size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                  Payout Details
+                </label>
+                <div style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {selectedPartner.payoutUpiId || selectedPartner.payoutBankAccountNumber ? (
+                    <>
+                      {selectedPartner.payoutUpiId && (
+                        <div style={{ fontSize: 12 }}>
+                          <span style={{ color: '#888', marginRight: 8 }}>UPI ID:</span>
+                          <span style={{ color: '#fff' }}>{selectedPartner.payoutUpiId}</span>
+                        </div>
+                      )}
+                      {selectedPartner.payoutBankAccountName && (
+                        <div style={{ fontSize: 12 }}>
+                          <span style={{ color: '#888', marginRight: 8 }}>Account Name:</span>
+                          <span style={{ color: '#fff' }}>{selectedPartner.payoutBankAccountName}</span>
+                        </div>
+                      )}
+                      {selectedPartner.payoutBankAccountNumber && (
+                        <div style={{ fontSize: 12 }}>
+                          <span style={{ color: '#888', marginRight: 8 }}>Account Number:</span>
+                          <span style={{ color: '#fff' }}>{selectedPartner.payoutBankAccountNumber}</span>
+                        </div>
+                      )}
+                      {selectedPartner.payoutBankIfsc && (
+                        <div style={{ fontSize: 12 }}>
+                          <span style={{ color: '#888', marginRight: 8 }}>IFSC Code:</span>
+                          <span style={{ color: '#fff' }}>{selectedPartner.payoutBankIfsc}</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#666', textAlign: 'center' }}>
+                      No payout details provided yet
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* SUPER ADMIN BARBER MANAGEMENT SECTION */}

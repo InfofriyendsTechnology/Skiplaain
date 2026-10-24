@@ -1,23 +1,29 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../../middleware/auth';
 import prisma from '../../utils/prisma';
 import responseHandler from '../../utils/responseHandler';
 
-export const getPartnerBookings = async (req: Request, res: Response) => {
+export const getPartnerBookings = async (req: AuthRequest, res: Response) => {
   try {
     const { partnerId } = req.params;
     const { status } = req.query;
 
+    if (!req.user) {
+      return responseHandler.unauthorized(res, 'Authentication required');
+    }
+
+    // Partner can only see their own bookings, admin can see all
+    if (req.user.type === 'partner' && req.user.id !== partnerId) {
+      return responseHandler.forbidden(res, 'Access denied: you can only view your own bookings');
+    }
+
     const bookings = await prisma.booking.findMany({
       where: {
-        partnerId,
+        partnerId: partnerId as string,
         ...(status && { status: status as string }),
       },
       include: {
-        bookingServices: {
-          include: {
-            service: true,
-          },
-        },
+        services: true,
         customer: {
           select: {
             id: true,

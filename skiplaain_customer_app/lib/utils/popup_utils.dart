@@ -317,7 +317,7 @@ class _TopNotificationState extends State<_TopNotification>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withValues(alpha: 0.3),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                       ),
@@ -349,7 +349,7 @@ class _TopNotificationState extends State<_TopNotification>
                             Text(
                               widget.message,
                               style: TextStyle(
-                                color: widget.textColor.withOpacity(0.9),
+                                color: widget.textColor.withValues(alpha: 0.9),
                                 fontSize: 14,
                               ),
                               maxLines: 3,
@@ -366,7 +366,7 @@ class _TopNotificationState extends State<_TopNotification>
                         },
                         child: Icon(
                           Icons.close_rounded,
-                          color: widget.textColor.withOpacity(0.7),
+                          color: widget.textColor.withValues(alpha: 0.7),
                           size: 20,
                         ),
                       ),
@@ -447,7 +447,7 @@ class _SuccessDialogState extends State<_SuccessDialog>
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00FF00).withOpacity(0.15),
+                  color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -514,7 +514,7 @@ class _ErrorDialog extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withOpacity(0.15),
+                color: const Color(0xFFEF4444).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -631,7 +631,7 @@ class _WarningDialog extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFA500).withOpacity(0.15),
+                color: const Color(0xFFFFA500).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -721,7 +721,7 @@ class _InfoDialog extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFF3B82F6).withOpacity(0.15),
+                color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -820,7 +820,7 @@ class _ConfirmationDialog extends StatelessWidget {
               height: 64,
               decoration: BoxDecoration(
                 color: (isDangerous ? const Color(0xFFEF4444) : const Color(0xFF3B82F6))
-                    .withOpacity(0.15),
+                    .withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(

@@ -8,7 +8,7 @@ export const updateCustomer = async (req: Request, res: Response) => {
     const updateData = req.body;
 
     const customer = await prisma.customer.update({
-      where: { phone },
+      where: { phone: phone as string },
       data: updateData,
     });
 

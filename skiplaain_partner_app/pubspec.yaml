@@ -12,9 +12,6 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  firebase_core: ^4.7.0
-  firebase_auth: ^6.4.0
-  cloud_firestore: ^6.3.0
   google_fonts: ^6.3.0
   intl_phone_field: ^3.2.0
   intl: ^0.19.0
@@ -23,7 +20,7 @@ dependencies:
   http: ^1.1.0
   geolocator: ^11.1.0
   flutter_dotenv: ^5.1.0
-  flutter_secure_storage: ^9.0.0  # For JWT token storage
+  flutter_secure_storage: ^9.0.0
 
 dev_dependencies:
   flutter_test:

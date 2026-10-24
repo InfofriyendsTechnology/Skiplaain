@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiCalendar, FiUserCheck, FiTrash2 } from 'react-icons/fi';
 import Navbar from '../../components/layout/Navbar';
-import { onBookingsSnapshot, clearAllBookings } from '../../services/firebaseService';
+import { onBookingsSnapshot, clearAllBookings } from '../../services/apiService';
 import toast from 'react-hot-toast';
 import './BookingsPage.scss';
 

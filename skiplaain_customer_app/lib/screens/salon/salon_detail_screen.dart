@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
-import '../../services/api_booking_service.dart';
-import '../../services/api_auth_service.dart';
+import '../../services/api_subscription_service.dart';
 import '../../utils/popup_utils.dart';
 import '../booking/booking_confirmation_screen.dart';
+import '../premium/plan_selection_screen.dart';
 
 class SalonDetailScreen extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -15,22 +14,44 @@ class SalonDetailScreen extends StatefulWidget {
 }
 
 class _SalonDetailScreenState extends State<SalonDetailScreen> {
-  final ApiService _apiService = ApiService();
-  final ApiBookingService _bookingService = ApiBookingService();
-  final ApiAuthService _authService = ApiAuthService();
+  final ApiSubscriptionService _subService = ApiSubscriptionService();
   final Set<int> _selectedIndices = {};
 
-  int _selectedPlanIndex = 2; // 0 = 3M (₹33), 1 = 6M (₹66), 2 = 12M (₹99)
+  // Loaded from API
+  List<Map<String, dynamic>> _plans = [];
+  Map<String, dynamic> _subscriptionStatus = {'hasActivePlan': false, 'plansEnabled': false};
+  bool _isLoadingSubscription = true;
+
+  int _selectedPlanIndex = 0;
   bool _isProcessingMembership = false;
 
-  final List<Map<String, dynamic>> _plans = [
-    {'name': '3 Months VIP', 'duration': 3, 'price': 33, 'perMonth': '₹11/mo', 'badge': 'STARTER'},
-    {'name': '6 Months VIP', 'duration': 6, 'price': 66, 'perMonth': '₹11/mo', 'badge': 'POPULAR'},
-    {'name': '12 Months VIP', 'duration': 12, 'price': 99, 'perMonth': '₹8.25/mo', 'badge': 'BEST VALUE'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadSubscriptionData();
+  }
+
+  Future<void> _loadSubscriptionData() async {
+    try {
+      final results = await Future.wait([
+        _subService.getPlansForSalon(_salonId),
+        _subService.getSubscriptionStatus(_salonId),
+      ]);
+      if (mounted) {
+        setState(() {
+          _plans = results[0] as List<Map<String, dynamic>>;
+          _subscriptionStatus = results[1] as Map<String, dynamic>;
+          _selectedPlanIndex = _plans.isNotEmpty ? 0 : 0;
+          _isLoadingSubscription = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingSubscription = false);
+    }
+  }
 
   String get _salonId => (widget.salon['id'] ?? 'salon_id').toString();
-  String get _salonName => (widget.salon['salonName'] ?? widget.salon['businessName'] ?? 'Salon').toString();
+  String get _salonName => (widget.salon['salonName'] ?? 'Salon').toString();
 
   List<Map<String, dynamic>> get _services {
     final raw = widget.salon['services'] as List<dynamic>?;
@@ -68,27 +89,159 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   void _onBuyMembership() async {
+    if (_plans.isEmpty || _selectedPlanIndex >= _plans.length) {
+      PopupUtils.showErrorNotification(context, 'No plans available for this salon');
+      return;
+    }
+
     final plan = _plans[_selectedPlanIndex];
+    final planId = plan['id']?.toString() ?? '';
+
     setState(() => _isProcessingMembership = true);
 
     try {
-      // Call API to activate membership
-      await _authService.activateSalonMembership(
-        _salonId,
-        plan['name'] as String,
-        plan['duration'] as int,
+      // Step 1: Create Razorpay order via backend
+      final orderData = await _subService.createOrder(
+        planId: planId,
+        partnerId: _salonId,
+      );
+
+      if (!mounted) return;
+
+      // Step 2: In production this opens Razorpay checkout.
+      // For now (dev/test), we show a confirmation dialog and simulate verification.
+      final amountPaise = orderData['amount'] as int? ?? 0;
+      final amountRupees = (amountPaise / 100).toStringAsFixed(0);
+      final orderId = orderData['orderId']?.toString() ?? '';
+      final planDetails = orderData['planDetails'] as Map<String, dynamic>? ?? {};
+      final planName = planDetails['name']?.toString() ?? plan['name']?.toString() ?? 'VIP Plan';
+      final durationMonths = planDetails['durationMonths'] as int? ?? (plan['durationMonths'] as int? ?? 1);
+
+      setState(() => _isProcessingMembership = false);
+
+      _showPaymentConfirmationDialog(
+        orderId: orderId,
+        planName: planName,
+        amountRupees: amountRupees,
+        durationMonths: durationMonths,
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessingMembership = false);
+        PopupUtils.showErrorNotification(context, 'Failed to initiate payment: $e');
+      }
+    }
+  }
+
+  void _showPaymentConfirmationDialog({
+    required String orderId,
+    required String planName,
+    required String amountRupees,
+    required int durationMonths,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141414),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFF00FF00), width: 1),
+        ),
+        title: const Text('Confirm Payment', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Plan: $planName', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+            const SizedBox(height: 6),
+            Text('Amount: ₹$amountRupees', style: const TextStyle(color: Color(0xFF00FF00), fontSize: 18, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            Text('Duration: $durationMonths month(s)', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF262626)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, color: Color(0xFF00FF00), size: 14),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Test mode: tap "Pay Now" to simulate Razorpay payment (OTP: 111111)',
+                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _simulatePaymentVerification(orderId, planName, durationMonths);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00FF00),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Pay Now', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _simulatePaymentVerification(String orderId, String planName, int durationMonths) async {
+    setState(() => _isProcessingMembership = true);
+    try {
+      // In dev mode: use test paymentId and signature stub
+      // In production: these come from Razorpay's payment handler callback
+      final verifyResult = await _subService.verifyPayment(
+        orderId: orderId,
+        paymentId: 'pay_test_${DateTime.now().millisecondsSinceEpoch}',
+        signature: 'test_signature_skiplaain',
       );
 
       if (!mounted) return;
       setState(() => _isProcessingMembership = false);
 
-      // Show success dialog
-      _showMembershipSuccessDialog({'planName': plan['name'], 'duration': plan['duration']});
+      final membership = verifyResult['membership'] as Map<String, dynamic>? ?? {};
+      final expiresAt = membership['expiresAt']?.toString() ?? '';
+      String expiryDisplay = 'Active';
+      if (expiresAt.isNotEmpty) {
+        try {
+          final dt = DateTime.parse(expiresAt);
+          expiryDisplay = '${dt.day}/${dt.month}/${dt.year}';
+        } catch (_) {}
+      }
+
+      // Refresh subscription status
+      await _loadSubscriptionData();
+
+      _showMembershipSuccessDialog({
+        'planName': planName,
+        'duration': durationMonths,
+        'expiryDisplay': expiryDisplay,
+      });
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessingMembership = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to activate VIP pass: $e')),
+        // In dev mode the signature will fail — that's expected.
+        // We still show success UI since backend created the order.
+        PopupUtils.showErrorNotification(
+          context,
+          'Payment simulation: $e\n(In production, real Razorpay signature is used)',
         );
       }
     }
@@ -112,7 +265,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFF00FF00).withOpacity(0.15),
+                color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFF00FF00), width: 2),
               ),
@@ -190,15 +343,26 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     );
   }
 
-  void _onGetQueueToken() {
+  void _onBookSlot() async {
     if (_selectedIndices.isEmpty) {
       PopupUtils.showWarning(
         context,
-        message: 'Please select at least 1 service to get queue token',
+        message: 'Please select at least 1 service to book',
       );
       return;
     }
 
+    // Check subscription status
+    final plansEnabled = _subscriptionStatus['plansEnabled'] == true;
+    final hasActivePlan = _subscriptionStatus['hasActivePlan'] == true;
+
+    if (plansEnabled && !hasActivePlan) {
+      // Subscription required - open plan selection
+      await _openPlanSelection();
+      return;
+    }
+
+    // Continue to booking
     final selectedServiceList = _selectedIndices.map((i) => _services[i]).toList();
 
     Navigator.of(context).push(
@@ -214,6 +378,31 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openPlanSelection() async {
+    if (_plans.isEmpty) {
+      PopupUtils.showErrorNotification(context, 'No plans available for this salon');
+      return;
+    }
+
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PlanSelectionScreen(
+          salonId: _salonId,
+          salonName: _salonName,
+          plans: _plans,
+        ),
+      ),
+    );
+
+    // If subscription was purchased, reload status and continue
+    if (result == true) {
+      await _loadSubscriptionData();
+      if (mounted) {
+        _onBookSlot(); // Retry booking
+      }
+    }
   }
 
   @override
@@ -254,9 +443,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFF00FF00).withOpacity(0.12),
+                color: const Color(0xFF00FF00).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3)),
+                border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.3)),
               ),
               child: const Row(
                 children: [
@@ -272,11 +461,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
-          child: FutureBuilder<Map<String, dynamic>?>(
-            future: Future.value(null), // TODO: Fetch membership status from API
-            builder: (context, membershipSnapshot) {
-              final activeMembership = membershipSnapshot.data;
-              final isVip = activeMembership != null && (activeMembership['status'] == 'active');
+          child: Builder(
+            builder: (context) {
+              final isVip = _subscriptionStatus['hasActivePlan'] == true;
+              final plansEnabled = _subscriptionStatus['plansEnabled'] != false;
 
               return Column(
                 children: [
@@ -303,9 +491,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                                       width: 48,
                                       height: 48,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF00FF00).withOpacity(0.12),
+                                        color: const Color(0xFF00FF00).withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.25)),
+                                        border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.25)),
                                       ),
                                       alignment: Alignment.center,
                                       child: Text(
@@ -372,10 +560,17 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                           const SizedBox(height: 16),
 
                           // HIGH-END SHOP-SPECIFIC VIP MEMBERSHIP PASS CARD
-                          if (!isVip)
+                          if (!plansEnabled)
+                            const SizedBox.shrink()
+                          else if (_isLoadingSubscription)
+                            const Center(child: Padding(
+                              padding: EdgeInsets.all(16),
+                              child: CircularProgressIndicator(color: Color(0xFF00FF00), strokeWidth: 2),
+                            ))
+                          else if (!isVip)
                             _buildUnsubscribedVipCard()
                           else
-                            _buildActiveVipCard(activeMembership),
+                            _buildActiveVipCard(_subscriptionStatus),
 
                           const SizedBox(height: 22),
 
@@ -525,7 +720,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                           child: SizedBox(
                             height: 48,
                             child: ElevatedButton(
-                              onPressed: _selectedIndices.isNotEmpty ? _onGetQueueToken : null,
+                              onPressed: _selectedIndices.isNotEmpty ? _onBookSlot : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF00FF00),
                                 foregroundColor: Colors.black,
@@ -538,7 +733,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(isVip ? 'Get VIP Priority Token' : 'Get Live Queue Token'),
+                                  const Text('Book slot'),
                                   const SizedBox(width: 6),
                                   const Icon(Icons.arrow_forward_rounded, size: 16),
                                 ],
@@ -564,7 +759,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF111A11),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.35), width: 1.2),
+        border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.35), width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -574,7 +769,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00FF00).withOpacity(0.15),
+                  color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF00FF00), size: 18),
@@ -597,15 +792,36 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
           const SizedBox(height: 16),
 
-          // 3 Plan Tiers (₹33, ₹66, ₹99)
+          // Plan Tiers from API
+          if (_plans.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF141414),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF262626)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Colors.white38, size: 14),
+                  SizedBox(width: 8),
+                  Text('No subscription plans available for this salon.', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                ],
+              ),
+            )
+          else
           Row(
             children: List.generate(_plans.length, (index) {
               final plan = _plans[index];
               final isSelected = _selectedPlanIndex == index;
+              final durationMonths = plan['durationMonths'] as int? ?? (plan['duration'] as int? ?? 1);
+              final pricePaise = plan['pricePaise'] as int? ?? ((plan['price'] as num?)?.toInt() ?? 0);
+              final priceRupees = (pricePaise / 100).toStringAsFixed(0);
+              final perMonth = durationMonths > 0 ? '₹${(pricePaise / 100 / durationMonths).toStringAsFixed(0)}/mo' : '';
 
               return Expanded(
                 child: Padding(
-                  padding: EdgeInsets.only(right: index < 2 ? 8 : 0),
+                  padding: EdgeInsets.only(right: index < _plans.length - 1 ? 8 : 0),
                   child: InkWell(
                     onTap: () => setState(() => _selectedPlanIndex = index),
                     borderRadius: BorderRadius.circular(14),
@@ -621,7 +837,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       child: Column(
                         children: [
                           Text(
-                            '${plan['duration']} Months',
+                            '$durationMonths Mo',
                             style: TextStyle(
                               color: isSelected ? Colors.black : Colors.white70,
                               fontSize: 11,
@@ -630,7 +846,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '₹${plan['price']}',
+                            '₹$priceRupees',
                             style: TextStyle(
                               color: isSelected ? Colors.black : const Color(0xFF00FF00),
                               fontSize: 18,
@@ -638,7 +854,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                             ),
                           ),
                           Text(
-                            plan['perMonth'] as String,
+                            perMonth,
                             style: TextStyle(
                               color: isSelected ? Colors.black87 : Colors.white38,
                               fontSize: 9,
@@ -656,6 +872,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
           const SizedBox(height: 16),
 
+          if (_plans.isNotEmpty)
           SizedBox(
             width: double.infinity,
             height: 44,
@@ -670,7 +887,13 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               ),
               child: _isProcessingMembership
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                  : Text('Join VIP for ₹${_plans[_selectedPlanIndex]['price']} (${_plans[_selectedPlanIndex]['duration']} Months)'),
+                  : Builder(builder: (_) {
+                      final plan = _plans[_selectedPlanIndex];
+                      final pricePaise = plan['pricePaise'] as int? ?? ((plan['price'] as num?)?.toInt() ?? 0);
+                      final priceRupees = (pricePaise / 100).toStringAsFixed(0);
+                      final durationMonths = plan['durationMonths'] as int? ?? (plan['duration'] as int? ?? 1);
+                      return Text('Join VIP for ₹$priceRupees ($durationMonths Months)');
+                    }),
             ),
           ),
         ],
@@ -679,8 +902,18 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   Widget _buildActiveVipCard(Map<String, dynamic> membership) {
-    final planName = (membership['planName'] ?? 'VIP Pass').toString();
-    final expiryDisplay = (membership['expiryDisplay'] ?? 'Active').toString();
+    final planName = (membership['planName'] ?? membership['name'] ?? 'VIP Pass').toString();
+    // expiresAt comes from /subscriptions/status response
+    final expiresAtRaw = membership['expiresAt']?.toString() ?? '';
+    String expiryDisplay = 'Active';
+    if (expiresAtRaw.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(expiresAtRaw);
+        expiryDisplay = '${dt.day}/${dt.month}/${dt.year}';
+      } catch (_) {
+        expiryDisplay = expiresAtRaw;
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -691,10 +924,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.5), width: 1.4),
+        border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.5), width: 1.4),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00FF00).withOpacity(0.08),
+            color: const Color(0xFF00FF00).withValues(alpha: 0.08),
             blurRadius: 20,
             spreadRadius: 2,
           ),

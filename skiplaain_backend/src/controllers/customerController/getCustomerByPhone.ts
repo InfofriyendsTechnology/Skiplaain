@@ -7,7 +7,7 @@ export const getCustomerByPhone = async (req: Request, res: Response) => {
     const { phone } = req.params;
 
     const customer = await prisma.customer.findUnique({
-      where: { phone },
+      where: { phone: phone as string },
       include: {
         bookings: {
           orderBy: { createdAt: 'desc' },

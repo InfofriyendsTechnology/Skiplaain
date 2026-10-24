@@ -196,10 +196,10 @@ class _OtpScreenState extends State<OtpScreen> {
                                   color: const Color(0xFF141414),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isFocused ? const Color(0xFF00FF00) : (isFilled ? const Color(0xFF00FF00).withOpacity(0.6) : const Color(0xFF262626)),
+                                    color: isFocused ? const Color(0xFF00FF00) : (isFilled ? const Color(0xFF00FF00).withValues(alpha: 0.6) : const Color(0xFF262626)),
                                     width: isFocused ? 2 : 1.2,
                                   ),
-                                  boxShadow: isFocused ? [BoxShadow(color: const Color(0xFF00FF00).withOpacity(0.25), blurRadius: 10)] : [],
+                                  boxShadow: isFocused ? [BoxShadow(color: const Color(0xFF00FF00).withValues(alpha: 0.25), blurRadius: 10)] : [],
                                 ),
                                 child: Text(char, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
                               ),

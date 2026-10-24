@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
 import '../../services/api_booking_service.dart';
+import '../../services/api_auth_service.dart';
 import '../../utils/popup_utils.dart';
+import '../../utils/error_handler.dart';
 import 'booking_ticket_screen.dart';
 
 class BookingConfirmationScreen extends StatefulWidget {
@@ -33,8 +34,8 @@ class BookingConfirmationScreen extends StatefulWidget {
 }
 
 class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
-  final ApiService _apiService = ApiService();
   final ApiBookingService _bookingService = ApiBookingService();
+  final ApiAuthService _authService = ApiAuthService();
   final TextEditingController _notesController = TextEditingController();
 
   late TextEditingController _nameController;
@@ -48,19 +49,8 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCustomerInfo();
-  }
-
-  Future<void> _loadCustomerInfo() async {
-    final token = await _apiService.getToken();
-    if (token != null) {
-      // TODO: Fetch customer profile from API
-      _nameController = TextEditingController(text: '');
-      _phoneController = TextEditingController(text: '');
-    } else {
-      _nameController = TextEditingController(text: '');
-      _phoneController = TextEditingController(text: '');
-    }
+    _nameController = TextEditingController(text: _authService.customerName);
+    _phoneController = TextEditingController(text: _authService.customerPhone);
   }
 
   @override
@@ -74,13 +64,17 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
   void _onConfirmBooking() async {
     if (_isBooking) return;
 
-    final customerName = _nameController.text.trim().isEmpty ? 'Customer' : _nameController.text.trim();
-    final customerPhone = _phoneController.text.trim().isEmpty ? '+919876543210' : _phoneController.text.trim();
+    final customerName = _nameController.text.trim().isEmpty
+        ? _authService.customerName
+        : _nameController.text.trim();
+    final customerPhone = _phoneController.text.trim().isEmpty
+        ? _authService.customerPhone
+        : _phoneController.text.trim();
 
     setState(() => _isBooking = true);
 
     try {
-      final salonName = (widget.salon['salonName'] ?? widget.salon['businessName'] ?? 'Salon').toString();
+      final salonName = (widget.salon['salonName'] ?? 'Salon').toString();
       
       final result = await _bookingService.createBooking(
         salonId: _salonId,
@@ -122,14 +116,33 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isBooking = false);
-        PopupUtils.showErrorNotification(context, 'Failed to create booking: $e');
+
+        // Handle specific error types
+        if (ApiErrorHandler.isSubscriptionRequired(e)) {
+          PopupUtils.showErrorNotification(
+            context,
+            'Active VIP subscription required. Please purchase a plan first.',
+          );
+        } else if (ApiErrorHandler.isAuthError(e)) {
+          PopupUtils.showErrorNotification(context, 'Session expired. Please login again.');
+          // Optionally navigate to login
+        } else if (ApiErrorHandler.isRateLimitError(e)) {
+          PopupUtils.showErrorNotification(context, 'Too many requests. Please try again shortly.');
+        } else if (ApiErrorHandler.isNetworkError(e)) {
+          PopupUtils.showErrorNotification(context, 'No internet connection. Please check your network and try again.');
+        } else {
+          PopupUtils.showErrorNotification(
+            context,
+            ApiErrorHandler.getErrorMessage(e),
+          );
+        }
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final salonName = (widget.salon['salonName'] ?? widget.salon['businessName'] ?? 'Salon').toString();
+    final salonName = (widget.salon['salonName'] ?? 'Salon').toString();
     final salonAddress = (widget.salon['address'] ?? widget.salon['location'] ?? 'Surat, Gujarat').toString();
 
     return Scaffold(

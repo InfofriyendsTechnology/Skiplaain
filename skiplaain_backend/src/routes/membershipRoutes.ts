@@ -2,16 +2,20 @@ import { Router } from 'express';
 import {
   getAllMemberships,
   getMembershipById,
-  createMembership,
   getCustomerMembership,
 } from '../controllers/membershipController';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireRole } from '../middleware/auth';
 
 const router = Router();
 
-router.get('/', authenticate, getAllMemberships);
-router.get('/:id', authenticate, getMembershipById);
-router.post('/', authenticate, createMembership);
+// Admin only routes
+router.get('/', authenticate, requireRole(['admin']), getAllMemberships);
+router.get('/:id', authenticate, requireRole(['admin']), getMembershipById);
+
+// DEPRECATED: Use /subscriptions/* endpoints instead
+// router.post('/', authenticate, requireRole(['admin']), createMembership);
+
+// Customer lookup
 router.get('/customer/:phone/:salonId', authenticate, getCustomerMembership);
 
 export default router;

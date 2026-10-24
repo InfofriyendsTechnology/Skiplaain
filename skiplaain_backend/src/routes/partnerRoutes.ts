@@ -8,22 +8,20 @@ import {
   updatePartnerStatus,
   checkPhone,
 } from '../controllers/partnerController';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireRole, requireOwnerOrAdmin } from '../middleware/auth';
 import { authRateLimiter, rateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
-// Phone check endpoint (for smart auth flow)
+// Public routes (onboarding and check-phone)
 router.post('/check-phone', authRateLimiter, checkPhone);
-
-// Public routes
-router.get('/', rateLimiter, getAllPartners);
-router.get('/:id', rateLimiter, getPartnerById);
-
-// Protected routes with rate limiting
 router.post('/', authRateLimiter, createPartner);
-router.put('/:id', authenticate, rateLimiter, updatePartner);
-router.delete('/:id', authenticate, rateLimiter, deletePartner);
-router.patch('/:id/status', authenticate, rateLimiter, updatePartnerStatus);
+
+// Protected routes - admin or owner
+router.get('/', authenticate, requireRole(['admin']), rateLimiter, getAllPartners);
+router.get('/:id', authenticate, requireOwnerOrAdmin, rateLimiter, getPartnerById);
+router.put('/:id', authenticate, requireOwnerOrAdmin, rateLimiter, updatePartner);
+router.delete('/:id', authenticate, requireOwnerOrAdmin, rateLimiter, deletePartner);
+router.patch('/:id/status', authenticate, requireRole(['admin']), rateLimiter, updatePartnerStatus);
 
 export default router;

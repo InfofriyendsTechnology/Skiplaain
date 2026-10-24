@@ -1,5 +1,5 @@
 // Skiplaain Database Schema
-// Maps Firebase Firestore collections to PostgreSQL tables
+// PostgreSQL (Neon DB) - Production Database
 
 datasource db {
   provider = "postgresql"
@@ -10,30 +10,56 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum PaymentStatus {
+  created
+  paid
+  failed
+}
+
+enum PayoutStatus {
+  pending
+  paid
+}
+
+enum CommissionStatus {
+  pending
+  included
+  paid
+}
+
 // Partner (Salon) Model
 model Partner {
-  id                String    @id @default(uuid())
-  phone             String    @unique
-  ownerName         String    @map("owner_name")
-  salonName         String    @map("salon_name")
-  address           String
-  city              String?
-  pincode           String?
-  email             String?
-  latitude          Float?
-  longitude         Float?
-  status            String    @default("pending") // pending, approved, blocked
-  profileImage      String?   @map("profile_image")
-  totalAppointments Int       @default(0) @map("total_appointments")
-  totalEarnings     Float     @default(0) @map("total_earnings")
-  rating            Float?
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id                      String    @id @default(uuid())
+  phone                   String    @unique
+  ownerName               String    @map("owner_name")
+  salonName               String    @map("salon_name")
+  address                 String
+  city                    String?
+  pincode                 String?
+  email                   String?
+  latitude                Float?
+  longitude               Float?
+  status                  String    @default("pending") // pending, approved, blocked
+  profileImage            String?   @map("profile_image")
+  totalAppointments       Int       @default(0) @map("total_appointments")
+  totalEarnings           Float     @default(0) @map("total_earnings") // DEPRECATED: use commission_ledger
+  rating                  Float?
+  commissionPercentOverride Float?  @map("commission_percent_override") // Salon-specific override
+  payoutUpiId             String?   @map("payout_upi_id")
+  payoutBankAccountName   String?   @map("payout_bank_account_name")
+  payoutBankAccountNumber String?   @map("payout_bank_account_number")
+  payoutBankIfsc          String?   @map("payout_bank_ifsc")
+  plansEnabled            Boolean   @default(true) @map("plans_enabled")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
   
-  barbers           Barber[]
-  services          Service[]
-  bookings          Booking[]
-  memberships       Membership[]
+  barbers                 Barber[]
+  services                Service[]
+  bookings                Booking[]
+  memberships             Membership[]
+  payments                Payment[]
+  commissionLedger        CommissionLedger[]
+  partnerPayouts          PartnerPayout[]
 
   @@map("partners")
 }
@@ -86,6 +112,7 @@ model Customer {
 
   bookings        Booking[]
   memberships     Membership[]
+  payments        Payment[]
 
   @@map("customers")
 }
@@ -139,27 +166,140 @@ model BookingService {
   @@map("booking_services")
 }
 
-// VIP Membership Model
+// Subscription Plans (Per-Salon Plans)
+model SubscriptionPlan {
+  id             String   @id @default(uuid())
+  name           String
+  durationMonths Int      @map("duration_months")
+  pricePaise     Int      @map("price_paise") // Price in paise (1 Rs = 100 paise)
+  isActive       Boolean  @default(true) @map("is_active")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  memberships    Membership[]
+  payments       Payment[]
+
+  @@map("subscription_plans")
+}
+
+// VIP Membership Model (Extended for Subscription System)
 model Membership {
-  id              String   @id @default(uuid())
-  membershipId    String   @unique @map("membership_id") // VIP-xxxxx
-  partnerId       String   @map("partner_id")
-  customerId      String   @map("customer_id")
-  salonName       String   @map("salon_name")
-  customerName    String   @map("customer_name")
-  customerPhone   String   @map("customer_phone")
-  planName        String   @map("plan_name")
-  price           Int
-  durationMonths  Int      @map("duration_months")
-  status          String   @default("active") // active, expired, cancelled
-  activatedAt     DateTime @map("activated_at")
-  expiresAt       DateTime @map("expires_at")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id                String   @id @default(uuid())
+  membershipId      String   @unique @map("membership_id") // VIP-xxxxx
+  partnerId         String   @map("partner_id")
+  customerId        String   @map("customer_id")
+  planId            String?  @map("plan_id") // FK to subscription_plans
+  salonName         String   @map("salon_name")
+  customerName      String   @map("customer_name")
+  customerPhone     String   @map("customer_phone")
+  planName          String   @map("plan_name")
+  price             Int      @map("price") // DEPRECATED: use pricePaise
+  pricePaise        Int      @map("price_paise") // Snapshot of price at purchase
+  durationMonths    Int      @map("duration_months")
+  commissionPercent Float    @map("commission_percent") // Snapshot of commission % at purchase
+  commissionPaise   Int      @map("commission_paise") // Calculated commission in paise
+  paymentId         String?  @unique @map("payment_id") // FK to payments
+  startsAt          DateTime @map("starts_at") // When this plan starts (for stacking)
+  status            String   @default("active") // active, expired, cancelled
+  activatedAt       DateTime @map("activated_at")
+  expiresAt         DateTime @map("expires_at")
+  createdAt         DateTime @default(now()) @map("created_at")
 
-  partner         Partner  @relation(fields: [partnerId], references: [id])
-  customer        Customer @relation(fields: [customerId], references: [id])
+  partner           Partner  @relation(fields: [partnerId], references: [id])
+  customer          Customer @relation(fields: [customerId], references: [id])
+  plan              SubscriptionPlan? @relation(fields: [planId], references: [id])
+  payment           Payment? @relation(fields: [paymentId], references: [id])
+  commissionLedger  CommissionLedger?
 
+  @@index([customerId, partnerId, status, expiresAt])
+  @@index([partnerId, status])
+  @@index([customerId])
   @@map("memberships")
+}
+
+// Payment Records (Razorpay Integration)
+model Payment {
+  id                 String    @id @default(uuid())
+  customerId         String    @map("customer_id")
+  partnerId          String    @map("partner_id")
+  planId             String    @map("plan_id")
+  amountPaise        Int       @map("amount_paise")
+  currency           String    @default("INR")
+  razorpayOrderId    String        @unique @map("razorpay_order_id")
+  razorpayPaymentId  String?       @map("razorpay_payment_id")
+  razorpaySignature  String?       @map("razorpay_signature")
+  status             PaymentStatus @default(created)
+  createdAt          DateTime      @default(now()) @map("created_at")
+  paidAt             DateTime?     @map("paid_at")
+
+  customer           Customer  @relation(fields: [customerId], references: [id])
+  partner            Partner   @relation(fields: [partnerId], references: [id])
+  plan               SubscriptionPlan @relation(fields: [planId], references: [id])
+  membership         Membership?
+  commissionLedger   CommissionLedger?
+
+  @@index([customerId])
+  @@index([partnerId])
+  @@index([status])
+  @@map("payments")
+}
+
+// Commission Ledger (Tracks Partner Commissions)
+model CommissionLedger {
+  id                String   @id @default(uuid())
+  partnerId         String   @map("partner_id")
+  membershipId      String   @unique @map("membership_id") // One ledger entry per membership
+  paymentId         String   @unique @map("payment_id")
+  grossPaise        Int              @map("gross_paise") // Full plan price
+  commissionPercent Float            @map("commission_percent") // Snapshot
+  commissionPaise   Int              @map("commission_paise") // Partner's commission
+  status            CommissionStatus @default(pending) // pending, included, paid
+  payoutId          String?          @map("payout_id") // FK to partner_payouts when paid
+  earnedAt          DateTime         @default(now()) @map("earned_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  partner           Partner  @relation(fields: [partnerId], references: [id])
+  membership        Membership @relation(fields: [membershipId], references: [id])
+  payment           Payment  @relation(fields: [paymentId], references: [id])
+  payout            PartnerPayout? @relation(fields: [payoutId], references: [id])
+
+  @@index([partnerId, status])
+  @@index([status, earnedAt])
+  @@map("commission_ledger")
+}
+
+// Partner Payouts (Manual Payouts to Salon Owners)
+model PartnerPayout {
+  id               String    @id @default(uuid())
+  partnerId        String    @map("partner_id")
+  periodStart      DateTime     @map("period_start")
+  periodEnd        DateTime     @map("period_end")
+  totalPaise       Int          @map("total_paise")
+  status           PayoutStatus @default(pending) // pending, paid
+  paidAt           DateTime?    @map("paid_at")
+  paymentReference String?      @map("payment_reference") // UPI ref / bank txn ID
+  paidBy           String?      @map("paid_by") // Admin username/ID
+  notes            String?
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  partner          Partner   @relation(fields: [partnerId], references: [id])
+  ledgerEntries    CommissionLedger[]
+
+  @@index([partnerId, status])
+  @@map("partner_payouts")
+}
+
+// Platform Settings (Single Row Config)
+model PlatformSettings {
+  id                String   @id @default("default")
+  commissionPercent Float    @default(10) @map("commission_percent") // Default commission %
+  payoutCycleDays   Int      @default(14) @map("payout_cycle_days") // Payout cycle in days
+  minPayoutPaise    Int      @default(0) @map("min_payout_paise") // Minimum payout amount
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
 }
 
 // OTP Verification Model

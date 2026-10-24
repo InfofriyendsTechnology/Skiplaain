@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
+import '../services/api_auth_service.dart';
 import 'home/home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -36,7 +36,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   void _initializeApp() async {
     // 1. Await persistent session restoration
-    await CustomerAuthService().initSession();
+    await ApiAuthService().initSession();
 
     // 2. Wait minimum 1.5s for clean logo presentation
     await Future.delayed(const Duration(milliseconds: 1500));

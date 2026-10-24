@@ -21,7 +21,7 @@ class StatusBadge extends StatelessWidget {
         vertical: compact ? 4 : 6,
       ),
       decoration: BoxDecoration(
-        color: config.color.withOpacity(0.15),
+        color: config.color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(compact ? 10 : 16),
         border: Border.all(
           color: config.color,

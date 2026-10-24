@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/partner_service.dart';
 import '../utils/transitions.dart';
 import 'login_screen.dart';
@@ -35,14 +34,17 @@ class _SplashScreenState extends State<SplashScreen> {
         final partnerId = (savedSession['id'] ?? 'partner_$cleanPhone').toString();
 
         if (phone.isNotEmpty) {
-          // Check Firestore if salon profile is completed
+          // Check if salon profile is completed via API
           bool isOnboarded = false;
           try {
-            final partnerDoc = await FirebaseFirestore.instance.collection('partners').doc(partnerId).get();
-            if (partnerDoc.exists && (partnerDoc.data()?['isOnboarded'] == true || partnerDoc.data()?['salonName'] != null)) {
+            final partnerData = await PartnerService().getPartnerProfile(partnerId);
+            if (partnerData != null && 
+                (partnerData['isOnboarded'] == true || partnerData['salonName'] != null)) {
               isOnboarded = true;
             }
-          } catch (_) {}
+          } catch (e) {
+            print('Error checking onboarding: $e');
+          }
 
           if (!mounted) return;
 

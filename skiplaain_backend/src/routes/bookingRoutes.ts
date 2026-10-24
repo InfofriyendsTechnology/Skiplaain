@@ -7,18 +7,20 @@ import {
   getCustomerBookings,
   getPartnerBookings,
 } from '../controllers/bookingController';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireRole } from '../middleware/auth';
 
 const router = Router();
 
-// Public booking creation
-router.post('/', createBooking);
+// Customer creates booking
+router.post('/', authenticate, requireRole(['customer']), createBooking);
 
 // Protected routes
-router.get('/', authenticate, getAllBookings);
-router.get('/:id', authenticate, getBookingById);
+router.get('/', authenticate, requireRole(['admin']), getAllBookings);
+router.get('/:id', authenticate, getBookingById); // Any authenticated user
 router.patch('/:id/status', authenticate, updateBookingStatus);
-router.get('/customer/:phone', authenticate, getCustomerBookings);
-router.get('/partner/:partnerId', authenticate, getPartnerBookings);
+
+// Scoped routes
+router.get('/customer/:phone', authenticate, getCustomerBookings); // Customer sees own, admin sees all
+router.get('/partner/:partnerId', authenticate, getPartnerBookings); // Partner sees own, admin sees all
 
 export default router;

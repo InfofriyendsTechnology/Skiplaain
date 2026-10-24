@@ -179,7 +179,7 @@ class _SalonDetailsScreenState extends State<SalonDetailsScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF1A1A1A),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFF00FF00).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [

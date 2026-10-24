@@ -12,7 +12,7 @@ export const updatePartnerStatus = async (req: Request, res: Response) => {
     }
 
     const partner = await prisma.partner.update({
-      where: { id },
+      where: { id: id as string },
       data: { status },
     });
 

@@ -154,7 +154,7 @@ class _HomeTabState extends State<HomeTab> {
                           onChanged: (val) {
                             setState(() => _isOnline = val);
                           },
-                          activeColor: Colors.black,
+                          activeThumbColor: Colors.black,
                           activeTrackColor: const Color(0xFF00FF00),
                           inactiveThumbColor: Colors.black,
                           inactiveTrackColor: Colors.red,

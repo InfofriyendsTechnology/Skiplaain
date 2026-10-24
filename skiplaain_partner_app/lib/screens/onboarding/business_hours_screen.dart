@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../services/partner_service.dart';
 import '../../utils/transitions.dart';
 import 'add_barbers_screen.dart';
 
@@ -27,7 +26,7 @@ class _BusinessHoursScreenState extends State<BusinessHoursScreen> {
   String _openingTime = "09:00 AM";
   String _closingTime = "09:00 PM";
   String _weeklyOff = "Sunday";
-  bool _isSaving = false;
+  final bool _isSaving = false;
 
   final List<String> _daysOfWeek = [
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'None'
@@ -250,7 +249,7 @@ class _BusinessHoursScreenState extends State<BusinessHoursScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00FF00),
                       foregroundColor: Colors.black,
-                      disabledBackgroundColor: const Color(0xFF00FF00).withOpacity(0.5),
+                      disabledBackgroundColor: const Color(0xFF00FF00).withValues(alpha: 0.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(4),
                       ),

@@ -487,7 +487,7 @@ class _ManageServicesScreenState extends State<ManageServicesScreen> {
                               ],
                             ),
                           );
-                        }).toList(),
+                        }),
                       ]
                     ],
                   ),

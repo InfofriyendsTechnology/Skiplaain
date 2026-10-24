@@ -6,6 +6,7 @@ import DashboardOverview from '../pages/dashboard/DashboardOverview';
 import PartnersPage from '../pages/partners/PartnersPage';
 import CustomersPage from '../pages/customers/CustomersPage';
 import BookingsPage from '../pages/bookings/BookingsPage';
+import PayoutsPage from '../pages/payouts/PayoutsPage';
 import SettingsPage from '../pages/settings/SettingsPage';
 
 const AppRoutes = () => {
@@ -24,6 +25,7 @@ const AppRoutes = () => {
           <Route path="/partners" element={<PartnersPage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/bookings" element={<BookingsPage />} />
+          <Route path="/payouts" element={<PayoutsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

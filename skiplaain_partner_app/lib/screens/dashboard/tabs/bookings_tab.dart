@@ -124,7 +124,7 @@ class _BookingsTabState extends State<BookingsTab> {
           boxShadow: isNew
               ? [
                   BoxShadow(
-                    color: const Color(0xFF00FF00).withOpacity(0.2),
+                    color: const Color(0xFF00FF00).withValues(alpha: 0.2),
                     blurRadius: 12,
                     spreadRadius: 1,
                   ),
@@ -146,12 +146,12 @@ class _BookingsTabState extends State<BookingsTab> {
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
                           colors: [
-                            const Color(0xFF00FF00).withOpacity(0.2),
-                            const Color(0xFF00FF00).withOpacity(0.1),
+                            const Color(0xFF00FF00).withValues(alpha: 0.2),
+                            const Color(0xFF00FF00).withValues(alpha: 0.1),
                           ],
                         ),
                         border: Border.all(
-                          color: const Color(0xFF00FF00).withOpacity(0.3),
+                          color: const Color(0xFF00FF00).withValues(alpha: 0.3),
                         ),
                       ),
                       alignment: Alignment.center,
@@ -356,7 +356,7 @@ class _BookingsTabState extends State<BookingsTab> {
                               Text(
                                 'New appointments will appear here',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
+                                  color: Colors.white.withValues(alpha: 0.5),
                                   fontSize: 14,
                                 ),
                               ),
