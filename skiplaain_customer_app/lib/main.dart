@@ -1,5 +1,4 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'screens/splash_screen.dart';
 import 'services/api_auth_service.dart';
 
@@ -19,7 +18,7 @@ class MyApp extends StatelessWidget {
       title: 'Skiplaain',
       theme: ThemeData(
         useMaterial3: true,
-        textTheme: GoogleFonts.poppinsTextTheme(),
+        fontFamily: 'Roboto', // Use system default instead of Google Fonts
       ),
       home: const SplashScreen(),
     );
