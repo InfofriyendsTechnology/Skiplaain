@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
@@ -11,14 +11,6 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-
-  // Redirect if already logged in
-  useEffect(() => {
-    const isAuth = sessionStorage.getItem('skiplaain_admin_auth') === 'true';
-    if (isAuth) {
-      navigate('/', { replace: true });
-    }
-  }, [navigate]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -37,11 +29,12 @@ const LoginPage = () => {
       if (email === adminEmail && password === adminPassword) {
         sessionStorage.setItem('skiplaain_admin_auth', 'true');
         toast.success('Welcome, Admin!');
-        navigate('/', { replace: true });
+        // Force a full page navigation to break the loop
+        window.location.href = '/';
       } else {
         toast.error('Invalid credentials');
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }, 600);
   };
 
