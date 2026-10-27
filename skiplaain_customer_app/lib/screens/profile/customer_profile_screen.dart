@@ -5,7 +5,6 @@ import '../../services/api_customer_service.dart';
 import '../../services/api_subscription_service.dart';
 import '../../utils/popup_utils.dart';
 import '../../services/api_booking_service.dart';
-import '../premium/my_plans_screen.dart';
 import '../booking/booking_ticket_screen.dart';
 import '../my_bookings/my_bookings_screen.dart';
 import '../home/home_screen.dart';

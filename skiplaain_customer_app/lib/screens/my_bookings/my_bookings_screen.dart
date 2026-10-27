@@ -161,14 +161,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                         final serviceSummary = services.map((s) => s['service']?['name'] ?? '').join(', ');
 
                         final isConfirmed = status == 'confirmed';
-                        final isCompleted = status == 'completed';
-
-                        Color badgeColor = const Color(0xFF00FF00);
-                        if (status == 'cancelled') {
-                          badgeColor = const Color(0xFFEF4444);
-                        } else if (isCompleted) {
-                          badgeColor = const Color(0xFF38BDF8);
-                        }
 
                   return GestureDetector(
                     onTap: () {
