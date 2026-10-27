@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/api_subscription_service.dart';
 import '../../utils/error_handler.dart';
+import 'plan_selection_screen.dart';
 
 class MyPlansScreen extends StatefulWidget {
   const MyPlansScreen({super.key});
@@ -52,11 +53,37 @@ class _MyPlansScreenState extends State<MyPlansScreen> {
       return;
     }
 
-    // Navigate to salon to see plans
-    Navigator.of(context).pushNamed(
-      '/salon-detail',
-      arguments: {'salonId': salonId, 'salonName': salonName},
+    // Load plans for this salon directly
+    List<Map<String, dynamic>> plans = [];
+    try {
+      plans = await _subService.getPlansForSalon(salonId);
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, AppError(message: 'Failed to load plans: $e'));
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    if (plans.isEmpty) {
+      ErrorHandler.showError(context, AppError(message: 'No plans available for this salon'));
+      return;
+    }
+
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PlanSelectionScreen(
+          salonId: salonId,
+          salonName: salonName,
+          plans: plans,
+        ),
+      ),
     );
+
+    if (result == true && mounted) {
+      _loadSubscriptions(); // Refresh the list
+    }
   }
 
   String _formatDate(String dateStr) {
@@ -217,8 +244,8 @@ class _MyPlansScreenState extends State<MyPlansScreen> {
             const SizedBox(height: 12),
             _buildInfoItem('Price Paid', '₹${sub['amountPaid'] ?? 0}'),
             
-            // Renew button for expired plans
-            if (!isActive) ...[
+            // Renew button: expired OR expiring within 7 days
+            if (!isActive || (isActive && daysLeft <= 7)) ...[
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -230,9 +257,9 @@ class _MyPlansScreenState extends State<MyPlansScreen> {
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text(
-                    'Renew Plan',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  child: Text(
+                    isActive ? 'Renew Early' : 'Renew Plan',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),

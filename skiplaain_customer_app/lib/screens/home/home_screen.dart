@@ -7,6 +7,7 @@ import '../../utils/popup_utils.dart';
 import '../auth/customer_onboarding_screen.dart';
 import '../booking/booking_confirmation_screen.dart';
 import '../my_bookings/my_bookings_screen.dart';
+import '../premium/plan_selection_screen.dart';
 import '../scanner/qr_scanner_screen.dart';
 import '../profile/customer_profile_screen.dart';
 
@@ -36,7 +37,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   final Set<int> _selectedServiceIndices = {};
   int _selectedPlanIndex = 0;
-  bool _isProcessingMembership = false;
 
   // Subscription state — loaded from API when salon is connected
   List<Map<String, dynamic>> _plans = [];
@@ -1082,7 +1082,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               width: double.infinity,
               height: 44,
               child: ElevatedButton(
-                onPressed: _isProcessingMembership ? null : () => _buyMembership(salonId, salonName),
+                onPressed: () => _buyMembership(salonId, salonName),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00FF00),
                   foregroundColor: Colors.black,
@@ -1090,14 +1090,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
                 ),
-                child: _isProcessingMembership
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                    : Builder(builder: (_) {
-                        final plan = _plans[_selectedPlanIndex];
-                        final pricePaise = plan['pricePaise'] as int? ?? ((plan['price'] as num?)?.toInt() ?? 0);
-                        final priceRupees = (pricePaise / 100).toStringAsFixed(0);
-                        final durationMonths = plan['durationMonths'] as int? ?? (plan['duration'] as int? ?? 1);
-                        return Text('Join VIP for ₹$priceRupees ($durationMonths Months)');
+                child: Builder(builder: (_) {
+                    final plan = _plans[_selectedPlanIndex];
+                    final pricePaise = plan['pricePaise'] as int? ?? ((plan['price'] as num?)?.toInt() ?? 0);
+                    final priceRupees = (pricePaise / 100).toStringAsFixed(0);
+                    final durationMonths = plan['durationMonths'] as int? ?? (plan['duration'] as int? ?? 1);
+                    return Text('Join VIP for ₹$priceRupees ($durationMonths Months)');
                       }),
               ),
             ),
@@ -1218,282 +1216,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   void _buyMembership(String salonId, String salonName) async {
     if (!mounted) return;
-    if (_plans.isEmpty || _selectedPlanIndex >= _plans.length) return;
+    if (_plans.isEmpty) return;
 
-    final plan = _plans[_selectedPlanIndex];
-    final planId = plan['id']?.toString() ?? '';
-    final pricePaise = plan['pricePaise'] as int? ?? ((plan['price'] as num?)?.toInt() ?? 0);
-    final priceRupees = (pricePaise / 100).toStringAsFixed(0);
-    final durationMonths = plan['durationMonths'] as int? ?? (plan['duration'] as int? ?? 1);
-    final planName = plan['name']?.toString() ?? 'VIP Plan';
-
-    setState(() => _isProcessingMembership = true);
-
-    try {
-      // Step 1: Create Razorpay order
-      final orderData = await _subService.createOrder(
-        planId: planId,
-        partnerId: salonId,
-      );
-
-      if (!mounted) return;
-      setState(() => _isProcessingMembership = false);
-
-      final orderId = orderData['orderId']?.toString() ?? '';
-
-      // Step 2: Show payment confirmation dialog
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF141414),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: Color(0xFF00FF00), width: 1),
-          ),
-          title: const Text('Confirm Payment', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Plan: $planName', style: const TextStyle(color: Colors.white70, fontSize: 14)),
-              const SizedBox(height: 6),
-              Text('Amount: ₹$priceRupees', style: const TextStyle(color: Color(0xFF00FF00), fontSize: 20, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 6),
-              Text('Duration: $durationMonths month(s)', style: const TextStyle(color: Colors.white54, fontSize: 13)),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF262626)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded, color: Color(0xFF00FF00), size: 14),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Test mode: tap "Pay Now" to simulate payment',
-                        style: TextStyle(color: Colors.white38, fontSize: 11),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(ctx).pop();
-                await _simulatePaymentVerification(orderId, planName, durationMonths, salonId, salonName);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00FF00),
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Pay Now', style: TextStyle(fontWeight: FontWeight.w800)),
-            ),
-          ],
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PlanSelectionScreen(
+          salonId: salonId,
+          salonName: salonName,
+          plans: _plans,
         ),
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isProcessingMembership = false);
-        PopupUtils.showErrorNotification(context, 'Failed to initiate payment: $e');
-      }
-    }
-  }
-
-  Future<void> _simulatePaymentVerification(
-    String orderId, String planName, int durationMonths, String salonId, String salonName) async {
-    if (!mounted) return;
-    setState(() => _isProcessingMembership = true);
-    try {
-      final verifyResult = await _subService.verifyPayment(
-        orderId: orderId,
-        paymentId: 'pay_test_${DateTime.now().millisecondsSinceEpoch}',
-        signature: 'test_signature_skiplaain',
-      );
-
-      if (!mounted) return;
-      setState(() => _isProcessingMembership = false);
-
-      final membership = verifyResult['membership'] as Map<String, dynamic>? ?? {};
-      final expiresAt = membership['expiresAt']?.toString() ?? '';
-      String expiryDisplay = 'Active';
-      if (expiresAt.isNotEmpty) {
-        try {
-          final dt = DateTime.parse(expiresAt);
-          expiryDisplay = '${dt.day}/${dt.month}/${dt.year}';
-        } catch (_) {}
-      }
-
-      // Refresh subscription status
-      setState(() => _loadedSubscriptionForSalonId = '');
-      await _loadSubscriptionData(salonId);
-
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: const Color(0xFF141414),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(color: Color(0xFF00FF00), width: 1.2),
-          ),
-          contentPadding: const EdgeInsets.all(24),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00FF00).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF00FF00), width: 2),
-                ),
-                child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF00FF00), size: 32),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '$planName Activated!',
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'VIP access at $salonName\nValid until $expiryDisplay',
-                style: const TextStyle(color: Colors.white60, fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00FF00),
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('Start Using VIP Pass', style: TextStyle(fontWeight: FontWeight.w800)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isProcessingMembership = false);
-        PopupUtils.showErrorNotification(
-          context,
-          'Payment simulation: $e\n(Real Razorpay integration requires live keys)',
-        );
-      }
-    }
-  }
-
-  // This dialog is now shown inline in _buyMembership method above
-  Widget _buildMembershipSuccessDialog({
-    required String salonName,
-    required Map<String, dynamic> data,
-  }) {
-    return AlertDialog(
-      backgroundColor: const Color(0xFF141414),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(28),
-        side: const BorderSide(color: Color(0xFF00FF00), width: 1.5),
-      ),
-      contentPadding: const EdgeInsets.all(24),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: const Color(0xFF00FF00).withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF00FF00), width: 2),
-            ),
-            child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF00FF00), size: 34),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'VIP Pass Activated!',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'You are now an active VIP member of $salonName',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF262626)),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Plan', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                    Text(data['planName'] ?? 'VIP Pass', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Valid Until', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                    Text(data['expiryDisplay'] ?? 'Active', style: const TextStyle(color: Color(0xFF00FF00), fontSize: 12, fontWeight: FontWeight.w800)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Line Skip Priority', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                    Text('UNLOCKED', style: TextStyle(color: Color(0xFF00FF00), fontSize: 12, fontWeight: FontWeight.w900)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00FF00),
-                foregroundColor: Colors.black,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-              ),
-              child: const Text('Start Using VIP Pass'),
-            ),
-          ),
-        ],
       ),
     );
+
+    if (result == true && mounted) {
+      setState(() => _loadedSubscriptionForSalonId = '');
+      await _loadSubscriptionData(salonId);
+    }
   }
 
   Widget _buildBenefitRow(IconData icon, String text) {
@@ -1865,7 +1603,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 border: Border.all(color: const Color(0xFF222222), width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF00FF00).withOpacity(0.06),
+                    color: const Color(0xFF00FF00).withValues(alpha: 0.06),
                     blurRadius: 30,
                     spreadRadius: 5,
                   ),
@@ -1884,7 +1622,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     child: Center(
                       child: Icon(
                         Icons.qr_code_scanner_rounded,
-                        color: const Color(0xFF00FF00).withOpacity(0.2),
+                        color: const Color(0xFF00FF00).withValues(alpha: 0.2),
                         size: 110,
                       ),
                     ),
@@ -1908,7 +1646,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF00FF00).withOpacity(0.8),
+                                color: const Color(0xFF00FF00).withValues(alpha: 0.8),
                                 blurRadius: 8,
                                 spreadRadius: 1,
                               ),
