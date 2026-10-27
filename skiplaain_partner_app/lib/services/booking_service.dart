@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'api_service.dart';
 
 class BookingService {
@@ -17,6 +18,40 @@ class BookingService {
       print('Error fetching partner bookings: $e');
       return [];
     }
+  }
+
+  /// Stream partner bookings with polling (30s interval)
+  /// Returns a stream that polls the API periodically
+  Stream<List<Map<String, dynamic>>> streamPartnerBookings(String partnerId) {
+    final controller = StreamController<List<Map<String, dynamic>>>();
+    Timer? timer;
+
+    Future<void> fetchAndEmit() async {
+      try {
+        final bookings = await getPartnerBookings(partnerId);
+        if (!controller.isClosed) {
+          controller.add(bookings);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    // Fetch immediately
+    fetchAndEmit();
+
+    // Then poll every 30 seconds
+    timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      fetchAndEmit();
+    });
+
+    controller.onCancel = () {
+      timer?.cancel();
+    };
+
+    return controller.stream;
   }
 
   /// Get booking by ID

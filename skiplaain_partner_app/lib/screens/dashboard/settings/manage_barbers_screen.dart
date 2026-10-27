@@ -453,7 +453,7 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
                               const Text('Add staff and configure their weekly schedules & planned leaves.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, fontSize: 12)),
                               const SizedBox(height: 16),
                               ElevatedButton(
-                                onPressed: () => _showAddOrEditBarberDialog(currentList: barbers, docId: docId),
+                                onPressed: () => _showAddOrEditBarberDialog(currentList: _barbers, docId: docId),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF00FF00),
                                   foregroundColor: Colors.black,
@@ -465,9 +465,9 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
                           ),
                         )
                       : ListView.builder(
-                          itemCount: barbers.length,
+                          itemCount: _barbers.length,
                           itemBuilder: (context, index) {
-                            final b = barbers[index];
+                            final b = _barbers[index];
                             final name = (b['name'] ?? 'Barber').toString();
                             final isAvailable = (b['isAvailable'] ?? true) as bool;
                             final rawWorkingDays = b['workingDays'] as List<dynamic>?;
@@ -569,7 +569,7 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
                                       color: isAvailable ? const Color(0xFF00FF00) : Colors.white38,
                                       size: 32,
                                     ),
-                                    onPressed: () => _toggleAvailability(index, barbers, docId, isAvailable),
+                                    onPressed: () => _toggleAvailability(index, _barbers, docId, isAvailable),
                                     tooltip: 'Toggle Availability',
                                   ),
                                   IconButton(
@@ -577,14 +577,14 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
                                     onPressed: () => _showAddOrEditBarberDialog(
                                       barber: b,
                                       index: index,
-                                      currentList: barbers,
+                                      currentList: _barbers,
                                       docId: docId,
                                     ),
                                     tooltip: 'Edit Schedule & Leaves',
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
-                                    onPressed: () => _deleteBarber(index, barbers, docId),
+                                    onPressed: () => _deleteBarber(index, _barbers, docId),
                                     tooltip: 'Delete',
                                   ),
                                 ],
@@ -592,11 +592,8 @@ class _ManageBarbersScreenState extends State<ManageBarbersScreen> {
                             );
                           },
                         ),
-                ),
-              ],
-            ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
