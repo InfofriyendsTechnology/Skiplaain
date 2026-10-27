@@ -42,6 +42,23 @@ class _MyPlansScreenState extends State<MyPlansScreen> {
     return DateTime.now().isBefore(endDate);
   }
 
+  void _onRenewPlan(Map<String, dynamic> sub) async {
+    final salon = sub['salon'] ?? {};
+    final salonId = salon['id']?.toString() ?? salon['salonId']?.toString() ?? '';
+    final salonName = salon['salonName']?.toString() ?? salon['name']?.toString() ?? 'Salon';
+
+    if (salonId.isEmpty) {
+      ErrorHandler.showError(context, AppError(message: 'Invalid salon information'));
+      return;
+    }
+
+    // Navigate to salon to see plans
+    Navigator.of(context).pushNamed(
+      '/salon-detail',
+      arguments: {'salonId': salonId, 'salonName': salonName},
+    );
+  }
+
   String _formatDate(String dateStr) {
     final date = DateTime.parse(dateStr);
     return DateFormat('MMM dd, yyyy').format(date);
@@ -199,6 +216,27 @@ class _MyPlansScreenState extends State<MyPlansScreen> {
             ),
             const SizedBox(height: 12),
             _buildInfoItem('Price Paid', '₹${sub['amountPaid'] ?? 0}'),
+            
+            // Renew button for expired plans
+            if (!isActive) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: () => _onRenewPlan(sub),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF00),
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text(
+                    'Renew Plan',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
