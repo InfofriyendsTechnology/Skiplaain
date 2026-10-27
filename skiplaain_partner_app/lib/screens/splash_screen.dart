@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import '../services/api_partner_service.dart';
 import '../services/partner_service.dart';
 import '../utils/transitions.dart';
 import 'login_screen.dart';
 import 'onboarding/welcome_partner_screen.dart';
 import 'dashboard/main_dashboard_screen.dart';
+import 'pending_approval_screen.dart';
+import 'blocked_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -14,6 +17,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   final PartnerService _partnerService = PartnerService();
+  final ApiPartnerService _apiPartnerService = ApiPartnerService();
 
   @override
   void initState() {
@@ -34,33 +38,43 @@ class _SplashScreenState extends State<SplashScreen> {
         final partnerId = (savedSession['id'] ?? 'partner_$cleanPhone').toString();
 
         if (phone.isNotEmpty) {
-          // Check if salon profile is completed via API
+          // Hydrate ApiPartnerService from prefs
+          await _apiPartnerService.initSession();
+
+          // Call GET /partners/:id to get live status
+          String status = 'pending';
           bool isOnboarded = false;
+
           try {
-            final partnerData = await PartnerService().getPartnerProfile(partnerId);
-            if (partnerData != null && 
-                (partnerData['isOnboarded'] == true || partnerData['salonName'] != null)) {
-              isOnboarded = true;
+            final partnerData = await _partnerService.getPartnerProfile(partnerId);
+            if (partnerData != null) {
+              status = (partnerData['status'] ?? 'pending').toString().toLowerCase();
+              isOnboarded = partnerData['salonName'] != null;
             }
-          } catch (e) {
-            print('Error checking onboarding: $e');
+          } catch (_) {
+            // Network failure — use cached status from prefs
+            status = _apiPartnerService.status;
+            isOnboarded = _apiPartnerService.salonName.isNotEmpty;
           }
 
           if (!mounted) return;
 
+          if (status == 'blocked') {
+            Navigator.pushReplacement(context, PremiumTransition(page: const BlockedScreen()));
+            return;
+          }
+
+          if (status == 'pending') {
+            Navigator.pushReplacement(context, PremiumTransition(page: const PendingApprovalScreen()));
+            return;
+          }
+
+          // status == 'approved'
           if (isOnboarded) {
-            // Already onboarded salon -> Go directly to Dashboard!
-            Navigator.pushReplacement(
-              context,
-              PremiumTransition(page: const MainDashboardScreen()),
-            );
+            Navigator.pushReplacement(context, PremiumTransition(page: const MainDashboardScreen()));
             return;
           } else {
-            // Session saved but onboarding in progress -> Resume Onboarding
-            Navigator.pushReplacement(
-              context,
-              PremiumTransition(page: WelcomePartnerScreen(phoneNumber: phone)),
-            );
+            Navigator.pushReplacement(context, PremiumTransition(page: WelcomePartnerScreen(phoneNumber: phone)));
             return;
           }
         }
@@ -70,10 +84,7 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     // No active session -> Go to Login
-    Navigator.pushReplacement(
-      context,
-      PremiumTransition(page: const LoginScreen()),
-    );
+    Navigator.pushReplacement(context, PremiumTransition(page: const LoginScreen()));
   }
 
   @override
