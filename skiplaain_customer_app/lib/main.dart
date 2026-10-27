@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'screens/splash_screen.dart';
+import 'screens/login_screen.dart';
 import 'services/api_auth_service.dart';
 
 void main() async {
@@ -18,9 +19,12 @@ class MyApp extends StatelessWidget {
       title: 'Skiplaain',
       theme: ThemeData(
         useMaterial3: true,
-        fontFamily: 'Roboto', // Use system default instead of Google Fonts
+        fontFamily: 'Roboto',
       ),
       home: const SplashScreen(),
+      routes: {
+        '/login': (context) => const LoginScreen(),
+      },
     );
   }
 }
