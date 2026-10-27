@@ -20,7 +20,7 @@ class PlanSelectionScreen extends StatefulWidget {
   State<PlanSelectionScreen> createState() => _PlanSelectionScreenState();
 }
 
-class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
+class _PlanSelectionScreenState extends State<PlanSelectionScreen> with WidgetsBindingObserver {
   final ApiSubscriptionService _subService = ApiSubscriptionService();
   late Razorpay _razorpay;
   
@@ -32,6 +32,7 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _razorpay = Razorpay();
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
@@ -40,8 +41,45 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _razorpay.clear();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isPaymentInProgress) {
+      // User returned to app after payment
+      // Check if payment succeeded by checking subscription status
+      _checkPaymentStatus();
+    }
+  }
+
+  Future<void> _checkPaymentStatus() async {
+    if (_pendingOrderId == null) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final status = await _subService.getSubscriptionStatus(widget.salonId);
+      final hasActivePlan = status['hasActivePlan'] as bool? ?? false;
+
+      if (!mounted) return;
+
+      setState(() {
+        _isProcessing = false;
+        _isPaymentInProgress = false;
+      });
+
+      if (hasActivePlan) {
+        PopupUtils.showSuccessNotification(context, 'VIP subscription activated!');
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
