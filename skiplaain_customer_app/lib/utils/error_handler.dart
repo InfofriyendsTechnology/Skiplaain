@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppError {
   final int? statusCode;
@@ -58,19 +59,26 @@ class AppError {
 }
 
 class ErrorHandler {
-  static void showError(BuildContext context, AppError error) {
+  static void showError(
+    BuildContext context,
+    AppError error, {
+    VoidCallback? onSubscriptionRequired,
+  }) {
+    if (error.isUnauthorized) {
+      handleUnauthorized(context);
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(error.userMessage ?? error.message),
         backgroundColor: error.isSubscriptionRequired ? Colors.orange : Colors.red,
         duration: Duration(seconds: error.isRateLimited ? 5 : 3),
-        action: error.isSubscriptionRequired
+        action: error.isSubscriptionRequired && onSubscriptionRequired != null
             ? SnackBarAction(
                 label: 'View Plans',
                 textColor: Colors.white,
-                onPressed: () {
-                  // Will be handled by caller
-                },
+                onPressed: onSubscriptionRequired,
               )
             : null,
       ),
@@ -78,7 +86,13 @@ class ErrorHandler {
   }
 
   static Future<void> handleUnauthorized(BuildContext context) async {
-    // Clear token and navigate to login
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    // Clear stored session
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('customer_data');
+    
+    if (context.mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    }
   }
 }

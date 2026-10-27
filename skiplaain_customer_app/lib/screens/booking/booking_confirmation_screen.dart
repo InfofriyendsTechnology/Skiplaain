@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/api_booking_service.dart';
 import '../../services/api_auth_service.dart';
-import '../../utils/popup_utils.dart';
+import '../../services/api_subscription_service.dart';
 import '../../utils/error_handler.dart';
+import '../premium/plan_selection_screen.dart';
 import 'booking_ticket_screen.dart';
 
 class BookingConfirmationScreen extends StatefulWidget {
@@ -119,7 +120,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
         
         // Parse error and show appropriate message
         if (e.toString().contains('402') || e.toString().contains('SUBSCRIPTION_REQUIRED')) {
-          ErrorHandler.showError(context, AppError(statusCode: 402, message: e.toString()));
+          await _handleSubscriptionRequired();
         } else if (e.toString().contains('401')) {
           ErrorHandler.showError(context, AppError(statusCode: 401, message: 'Session expired'));
           await ErrorHandler.handleUnauthorized(context);
@@ -130,6 +131,44 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
         } else {
           ErrorHandler.showError(context, AppError(message: e.toString()));
         }
+      }
+    }
+  }
+
+  Future<void> _handleSubscriptionRequired() async {
+    final salonName = (widget.salon['salonName'] ?? 'Salon').toString();
+    
+    // Load plans for this salon
+    final ApiSubscriptionService subService = ApiSubscriptionService();
+    
+    try {
+      final plans = await subService.getPlansForSalon(_salonId);
+      
+      if (!mounted) return;
+      
+      if (plans.isEmpty) {
+        ErrorHandler.showError(context, AppError(message: 'No subscription plans available for this salon'));
+        return;
+      }
+      
+      // Open plan selection screen
+      final result = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => PlanSelectionScreen(
+            salonId: _salonId,
+            salonName: salonName,
+            plans: plans,
+          ),
+        ),
+      );
+      
+      // If plan was purchased, retry booking once
+      if (result == true && mounted) {
+        _onConfirmBooking();
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, AppError(message: 'Failed to load plans: $e'));
       }
     }
   }

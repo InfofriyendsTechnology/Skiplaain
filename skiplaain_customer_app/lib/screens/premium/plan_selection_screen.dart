@@ -257,12 +257,54 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> with WidgetsB
 
                       // Plans
                       if (widget.plans.isEmpty)
-                        const Center(
+                        Center(
                           child: Padding(
-                            padding: EdgeInsets.all(40),
-                            child: Text(
-                              'No plans available',
-                              style: TextStyle(color: Colors.white54, fontSize: 14),
+                            padding: const EdgeInsets.all(40),
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF141414),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: const Color(0xFF262626)),
+                                  ),
+                                  child: const Icon(
+                                    Icons.info_outline_rounded,
+                                    size: 48,
+                                    color: Colors.white38,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'No Plans Available',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'This salon has not set up subscription plans yet.',
+                                  style: TextStyle(color: Colors.white54, fontSize: 14),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 24),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF141414),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: const BorderSide(color: Color(0xFF262626)),
+                                    ),
+                                  ),
+                                  child: const Text('Go Back'),
+                                ),
+                              ],
                             ),
                           ),
                         )
@@ -286,7 +328,7 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> with WidgetsB
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
                                   color: isSelected
-                                      ? const Color(0xFF00FF00).withOpacity(0.08)
+                                      ? const Color(0xFF00FF00).withValues(alpha: 0.08)
                                       : const Color(0xFF141414),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
