@@ -246,4 +246,43 @@ class ApiPartnerService {
 
     throw Exception('Failed to fetch partner data');
   }
+
+  /// Update partner profile
+  Future<Map<String, dynamic>> updatePartnerProfile({
+    String? salonName,
+    String? address,
+    String? city,
+    String? pincode,
+    String? email,
+    double? latitude,
+    double? longitude,
+    List<Map<String, dynamic>>? barbers,
+    List<Map<String, dynamic>>? services,
+  }) async {
+    if (_partnerId == null || _partnerId!.isEmpty) {
+      throw Exception('Partner not logged in');
+    }
+
+    final body = <String, dynamic>{};
+    if (salonName != null) body['salonName'] = salonName;
+    if (address != null) body['address'] = address;
+    if (city != null) body['city'] = city;
+    if (pincode != null) body['pincode'] = pincode;
+    if (email != null) body['email'] = email;
+    if (latitude != null) body['latitude'] = latitude;
+    if (longitude != null) body['longitude'] = longitude;
+    if (barbers != null) body['barbers'] = barbers;
+    if (services != null) body['services'] = services;
+
+    final result = await _api.patch('/partners/$_partnerId', body);
+
+    if (result['success'] == true && result['data'] != null) {
+      final data = result['data'] as Map<String, dynamic>;
+      _salonName = data['salonName'] ?? _salonName;
+      _status = data['status'] ?? _status;
+      await _persistSession();
+    }
+
+    return result;
+  }
 }
