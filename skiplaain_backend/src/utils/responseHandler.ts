@@ -36,6 +36,10 @@ class ResponseHandler {
   badRequest(res: Response, message: string = 'Bad request', errors?: any) {
     return this.error(res, message, 400, errors);
   }
+
+  conflict(res: Response, message: string = 'Conflict') {
+    return this.error(res, message, 409);
+  }
 }
 
 export default new ResponseHandler();
