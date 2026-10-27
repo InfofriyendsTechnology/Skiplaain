@@ -23,7 +23,6 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   bool _isLoadingSubscription = true;
 
   int _selectedPlanIndex = 0;
-  bool _isProcessingMembership = false;
 
   @override
   void initState() {
@@ -86,261 +85,6 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       }
     }
     return duration;
-  }
-
-  void _onBuyMembership() async {
-    if (_plans.isEmpty || _selectedPlanIndex >= _plans.length) {
-      PopupUtils.showErrorNotification(context, 'No plans available for this salon');
-      return;
-    }
-
-    final plan = _plans[_selectedPlanIndex];
-    final planId = plan['id']?.toString() ?? '';
-
-    setState(() => _isProcessingMembership = true);
-
-    try {
-      // Step 1: Create Razorpay order via backend
-      final orderData = await _subService.createOrder(
-        planId: planId,
-        partnerId: _salonId,
-      );
-
-      if (!mounted) return;
-
-      // Step 2: In production this opens Razorpay checkout.
-      // For now (dev/test), we show a confirmation dialog and simulate verification.
-      final amountPaise = orderData['amount'] as int? ?? 0;
-      final amountRupees = (amountPaise / 100).toStringAsFixed(0);
-      final orderId = orderData['orderId']?.toString() ?? '';
-      final planDetails = orderData['planDetails'] as Map<String, dynamic>? ?? {};
-      final planName = planDetails['name']?.toString() ?? plan['name']?.toString() ?? 'VIP Plan';
-      final durationMonths = planDetails['durationMonths'] as int? ?? (plan['durationMonths'] as int? ?? 1);
-
-      setState(() => _isProcessingMembership = false);
-
-      _showPaymentConfirmationDialog(
-        orderId: orderId,
-        planName: planName,
-        amountRupees: amountRupees,
-        durationMonths: durationMonths,
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isProcessingMembership = false);
-        PopupUtils.showErrorNotification(context, 'Failed to initiate payment: $e');
-      }
-    }
-  }
-
-  void _showPaymentConfirmationDialog({
-    required String orderId,
-    required String planName,
-    required String amountRupees,
-    required int durationMonths,
-  }) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141414),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: Color(0xFF00FF00), width: 1),
-        ),
-        title: const Text('Confirm Payment', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Plan: $planName', style: const TextStyle(color: Colors.white70, fontSize: 14)),
-            const SizedBox(height: 6),
-            Text('Amount: ₹$amountRupees', style: const TextStyle(color: Color(0xFF00FF00), fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 6),
-            Text('Duration: $durationMonths month(s)', style: const TextStyle(color: Colors.white54, fontSize: 13)),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF262626)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline_rounded, color: Color(0xFF00FF00), size: 14),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Test mode: tap "Pay Now" to simulate Razorpay payment (OTP: 111111)',
-                      style: TextStyle(color: Colors.white38, fontSize: 11),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await _simulatePaymentVerification(orderId, planName, durationMonths);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF00),
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Pay Now', style: TextStyle(fontWeight: FontWeight.w800)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _simulatePaymentVerification(String orderId, String planName, int durationMonths) async {
-    setState(() => _isProcessingMembership = true);
-    try {
-      // In dev mode: use test paymentId and signature stub
-      // In production: these come from Razorpay's payment handler callback
-      final verifyResult = await _subService.verifyPayment(
-        orderId: orderId,
-        paymentId: 'pay_test_${DateTime.now().millisecondsSinceEpoch}',
-        signature: 'test_signature_skiplaain',
-      );
-
-      if (!mounted) return;
-      setState(() => _isProcessingMembership = false);
-
-      final membership = verifyResult['membership'] as Map<String, dynamic>? ?? {};
-      final expiresAt = membership['expiresAt']?.toString() ?? '';
-      String expiryDisplay = 'Active';
-      if (expiresAt.isNotEmpty) {
-        try {
-          final dt = DateTime.parse(expiresAt);
-          expiryDisplay = '${dt.day}/${dt.month}/${dt.year}';
-        } catch (_) {}
-      }
-
-      // Refresh subscription status
-      await _loadSubscriptionData();
-
-      _showMembershipSuccessDialog({
-        'planName': planName,
-        'duration': durationMonths,
-        'expiryDisplay': expiryDisplay,
-      });
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isProcessingMembership = false);
-        // In dev mode the signature will fail — that's expected.
-        // We still show success UI since backend created the order.
-        PopupUtils.showErrorNotification(
-          context,
-          'Payment simulation: $e\n(In production, real Razorpay signature is used)',
-        );
-      }
-    }
-  }
-
-  void _showMembershipSuccessDialog(Map<String, dynamic> data) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141414),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: Color(0xFF00FF00), width: 1.2),
-        ),
-        contentPadding: const EdgeInsets.all(24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: const Color(0xFF00FF00).withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF00FF00), width: 2),
-              ),
-              child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF00FF00), size: 34),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'VIP Pass Activated!',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'You are now an active VIP member of $_salonName',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-            const SizedBox(height: 20),
-
-            // Pass Details Card
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF262626)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Plan', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                      Text(data['planName'] ?? 'VIP Pass', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Valid Until', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                      Text(data['expiryDisplay'] ?? 'Active', style: const TextStyle(color: Color(0xFF00FF00), fontSize: 12, fontWeight: FontWeight.w800)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Line Skip Priority', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                      Text('UNLOCKED', style: TextStyle(color: Color(0xFF00FF00), fontSize: 12, fontWeight: FontWeight.w900)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00FF00),
-                  foregroundColor: Colors.black,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-                ),
-                child: const Text('Start Using VIP Pass'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   void _onBookSlot() async {
@@ -877,7 +621,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             width: double.infinity,
             height: 44,
             child: ElevatedButton(
-              onPressed: _isProcessingMembership ? null : _onBuyMembership,
+              onPressed: _openPlanSelection,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00FF00),
                 foregroundColor: Colors.black,
@@ -885,15 +629,13 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
               ),
-              child: _isProcessingMembership
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                  : Builder(builder: (_) {
-                      final plan = _plans[_selectedPlanIndex];
-                      final pricePaise = plan['pricePaise'] as int? ?? ((plan['price'] as num?)?.toInt() ?? 0);
-                      final priceRupees = (pricePaise / 100).toStringAsFixed(0);
-                      final durationMonths = plan['durationMonths'] as int? ?? (plan['duration'] as int? ?? 1);
-                      return Text('Join VIP for ₹$priceRupees ($durationMonths Months)');
-                    }),
+              child: Builder(builder: (_) {
+                final plan = _plans[_selectedPlanIndex];
+                final pricePaise = plan['pricePaise'] as int? ?? ((plan['price'] as num?)?.toInt() ?? 0);
+                final priceRupees = (pricePaise / 100).toStringAsFixed(0);
+                final durationMonths = plan['durationMonths'] as int? ?? (plan['duration'] as int? ?? 1);
+                return Text('Join VIP for ₹$priceRupees ($durationMonths Months)');
+              }),
             ),
           ),
         ],
