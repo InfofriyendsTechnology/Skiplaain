@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
-import { FiUsers, FiCalendar, FiTrendingUp, FiAward, FiInbox, FiUserCheck, FiDollarSign } from 'react-icons/fi';
+import { useOutletContext } from 'react-router-dom';
+import { FiDollarSign, FiTrendingUp, FiAward, FiUsers, FiInbox } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import Navbar from '../../components/layout/Navbar';
 import StatCard from '../../components/common/StatCard';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { getRevenue } from '../../services/apiService';
+import { formatMoney } from '../../utils/formatMoney';
 import toast from 'react-hot-toast';
 import './DashboardOverview.scss';
 
@@ -14,7 +16,6 @@ const DashboardOverview = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const { onMenuClick } = useOutletContext() || {};
-  const navigate = useNavigate();
 
   useEffect(() => {
     fetchRevenue();
@@ -47,13 +48,7 @@ const DashboardOverview = () => {
   const handleClearFilter = () => {
     setDateFrom('');
     setDateTo('');
-    // Auto-fetch after clearing
     setTimeout(() => fetchRevenue(), 100);
-  };
-
-  const formatCurrency = (paise) => {
-    if (paise == null || isNaN(paise)) return '₹0.00';
-    return `₹${(paise / 100).toFixed(2)}`;
   };
 
   if (loading) {
@@ -65,9 +60,7 @@ const DashboardOverview = () => {
           onMenuClick={onMenuClick}
         />
         <div className="page-container">
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#888' }}>
-            Loading...
-          </div>
+          <LoadingSpinner size="large" text="Loading revenue data..." />
         </div>
       </>
     );
@@ -122,23 +115,23 @@ const DashboardOverview = () => {
         <div className="stats-grid">
           <StatCard
             icon={<FiDollarSign />}
-            label="Total Sales"
-            value={formatCurrency(revenueData?.totalSales || 0)}
+            label="Total Plan Sales"
+            value={formatMoney(revenueData?.totalPlanSales || 0)}
           />
           <StatCard
             icon={<FiTrendingUp />}
             label="Commission Owed"
-            value={formatCurrency(revenueData?.commissionOwed || 0)}
+            value={formatMoney(revenueData?.commissionOwed || 0)}
           />
           <StatCard
             icon={<FiAward />}
             label="Commission Paid"
-            value={formatCurrency(revenueData?.commissionPaid || 0)}
+            value={formatMoney(revenueData?.commissionPaid || 0)}
           />
           <StatCard
             icon={<FiUsers />}
             label="Platform Net"
-            value={formatCurrency(revenueData?.platformNet || 0)}
+            value={formatMoney(revenueData?.platformNet || 0)}
           />
         </div>
 
@@ -169,10 +162,10 @@ const DashboardOverview = () => {
                   {revenueData.bySalon.map((salon, idx) => (
                     <tr key={idx}>
                       <td className="td-primary">{salon.salonName || '—'}</td>
-                      <td>{formatCurrency(salon.totalSales)}</td>
-                      <td style={{ color: '#f59e0b' }}>{formatCurrency(salon.commissionOwed)}</td>
-                      <td style={{ color: '#10b981' }}>{formatCurrency(salon.commissionPaid)}</td>
-                      <td style={{ color: '#00ff00' }}>{formatCurrency(salon.platformNet)}</td>
+                      <td>{formatMoney(salon.totalSales)}</td>
+                      <td style={{ color: '#f59e0b' }}>{formatMoney(salon.commissionOwed)}</td>
+                      <td style={{ color: '#10b981' }}>{formatMoney(salon.commissionPaid)}</td>
+                      <td style={{ color: '#00ff00' }}>{formatMoney(salon.platformNet)}</td>
                     </tr>
                   ))}
                 </tbody>

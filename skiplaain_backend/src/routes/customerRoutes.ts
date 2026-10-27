@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getAllCustomers, getCustomerByPhone, updateCustomer, getMe, updateMe } from '../controllers/customerController';
+import { deleteCustomer } from '../controllers/customerController/deleteCustomer';
 import { authenticate, requireRole } from '../middleware/auth';
 
 const router = Router();
@@ -11,6 +12,7 @@ router.put('/me', authenticate, requireRole(['customer']), updateMe);
 // Admin only routes
 router.get('/', authenticate, requireRole(['admin']), getAllCustomers);
 router.get('/:phone', authenticate, requireRole(['admin']), getCustomerByPhone);
+router.delete('/:phone', authenticate, requireRole(['admin']), deleteCustomer);
 
 // Customer or admin can update
 router.put('/:phone', authenticate, updateCustomer);

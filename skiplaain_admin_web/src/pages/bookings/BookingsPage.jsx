@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiCalendar, FiUserCheck, FiTrash2 } from 'react-icons/fi';
 import Navbar from '../../components/layout/Navbar';
-import { onBookingsSnapshot, clearAllBookings } from '../../services/apiService';
+import { onBookingsSnapshot } from '../../services/apiService';
 import toast from 'react-hot-toast';
 import './BookingsPage.scss';
 
@@ -21,21 +21,8 @@ const BookingsPage = () => {
   }, []);
 
   const handleClearHistory = async () => {
-    if (bookings.length === 0) {
-      toast.error('No bookings to clear.');
-      return;
-    }
-    if (!window.confirm(`⚠️ Are you sure you want to delete all ${bookings.length} booking(s)? This will permanently clear booking history.`)) return;
-
-    setIsClearing(true);
-    try {
-      const count = await clearAllBookings();
-      toast.success(`Cleared ${count} booking(s) successfully!`);
-    } catch (err) {
-      toast.error('Failed to clear bookings: ' + err.message);
-    } finally {
-      setIsClearing(false);
-    }
+    // Function removed for safety - use single deletes only
+    toast.error('Batch delete disabled for safety. Delete bookings individually.');
   };
 
   const filters = ['All', 'Confirmed', 'Pending', 'Completed', 'Cancelled'];
@@ -66,16 +53,6 @@ const BookingsPage = () => {
               <h3 className="data-table-title">All Bookings</h3>
               <span className="data-table-count">{filteredBookings.length} bookings</span>
             </div>
-            {bookings.length > 0 && (
-              <button 
-                className="btn btn-danger btn-sm" 
-                onClick={handleClearHistory}
-                disabled={isClearing}
-                style={{ padding: '6px 12px', fontSize: 12 }}
-              >
-                <FiTrash2 /> Clear All History
-              </button>
-            )}
           </div>
           {filteredBookings.length > 0 ? (
             <div className="table-responsive">

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { FiUsers, FiSearch, FiRepeat, FiAward, FiDollarSign, FiClock, FiX, FiTrash2 } from 'react-icons/fi';
 import Navbar from '../../components/layout/Navbar';
 import StatCard from '../../components/common/StatCard';
-import { onCustomersSnapshot, onBookingsSnapshot, onMembershipsSnapshot, clearAllCustomers } from '../../services/apiService';
+import { onCustomersSnapshot, onBookingsSnapshot, onMembershipsSnapshot } from '../../services/apiService';
 import toast from 'react-hot-toast';
 import './CustomersPage.scss';
 
@@ -200,21 +200,9 @@ const CustomersPage = () => {
           </div>
 
           {totalCustomers > 0 && (
-            <button 
-              className="btn btn-danger btn-sm" 
-              onClick={async () => {
-                if (!window.confirm(`⚠️ Delete all ${totalCustomers} customer account(s)? This cannot be undone.`)) return;
-                try {
-                  const count = await clearAllCustomers();
-                  toast.success(`Cleared ${count} customer record(s)!`);
-                } catch (e) {
-                  toast.error('Failed to clear customers: ' + e.message);
-                }
-              }}
-              style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12 }}
-            >
-              <FiTrash2 /> Clear All Customers
-            </button>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#888' }}>
+              {/* Clear All button removed for safety - use single deletes only */}
+            </span>
           )}
         </div>
 

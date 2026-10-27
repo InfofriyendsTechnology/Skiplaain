@@ -7,6 +7,7 @@ import {
   getCustomerBookings,
   getPartnerBookings,
 } from '../controllers/bookingController';
+import { deleteBooking } from '../controllers/bookingController/deleteBooking';
 import { authenticate, requireRole } from '../middleware/auth';
 
 const router = Router();
@@ -18,6 +19,7 @@ router.post('/', authenticate, requireRole(['customer']), createBooking);
 router.get('/', authenticate, requireRole(['admin']), getAllBookings);
 router.get('/:id', authenticate, getBookingById); // Any authenticated user
 router.patch('/:id/status', authenticate, updateBookingStatus);
+router.delete('/:id', authenticate, requireRole(['admin']), deleteBooking);
 
 // Scoped routes
 router.get('/customer/:phone', authenticate, getCustomerBookings); // Customer sees own, admin sees all

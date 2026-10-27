@@ -11,6 +11,7 @@ import {
   generatePayouts,
   getPayouts,
   markPayoutPaid,
+  getPendingPayoutsSummary,
 } from '../controllers/adminController';
 import { authenticate, requireRole } from '../middleware/auth';
 
@@ -37,6 +38,7 @@ router.get('/revenue', getRevenue);
 
 // Payouts
 router.post('/payouts/generate', generatePayouts);
+router.get('/payouts/pending-summary', getPendingPayoutsSummary);
 router.get('/payouts', getPayouts);
 router.post('/payouts/:id/mark-paid', markPayoutPaid);
 

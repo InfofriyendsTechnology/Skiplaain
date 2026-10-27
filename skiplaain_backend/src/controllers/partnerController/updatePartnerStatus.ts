@@ -5,10 +5,15 @@ import responseHandler from '../../utils/responseHandler';
 export const updatePartnerStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status } = req.body; // approved, pending, blocked
+    const { status } = req.body;
 
-    if (!['approved', 'pending', 'blocked'].includes(status)) {
-      return responseHandler.badRequest(res, 'Invalid status value');
+    const validStatuses = ['pending', 'approved', 'blocked'];
+
+    if (!validStatuses.includes(status)) {
+      return responseHandler.badRequest(
+        res,
+        `Invalid status value. Valid values are: ${validStatuses.join(', ')}`
+      );
     }
 
     const partner = await prisma.partner.update({

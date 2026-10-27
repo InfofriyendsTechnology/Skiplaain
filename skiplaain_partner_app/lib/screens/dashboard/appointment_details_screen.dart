@@ -456,8 +456,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ),
           ),
         );
-      },
-    );
   }
 
   Widget _buildSectionTitle(String title) {

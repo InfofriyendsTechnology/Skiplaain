@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 import Navbar from '../../components/layout/Navbar';
 import { FiLogOut, FiSave, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX } from 'react-icons/fi';
+import { useAuth } from '../../context/AuthContext';
 import { 
   getAdminSettings, 
   updateAdminSettings,
@@ -14,7 +15,7 @@ import toast from 'react-hot-toast';
 import './SettingsPage.scss';
 
 const SettingsPage = () => {
-  const navigate = useNavigate();
+  const { logout } = useAuth();
   const { onMenuClick } = useOutletContext() || {};
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -161,10 +162,7 @@ const SettingsPage = () => {
 
   const handleLogout = () => {
     logout();
-    localStorage.removeItem('admin_token');
-    sessionStorage.removeItem('skiplaain_admin_auth');
     toast.success('Logged out');
-    navigate('/login');
   };
 
   if (loading) {

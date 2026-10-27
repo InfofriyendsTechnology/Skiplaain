@@ -42,10 +42,12 @@ export const deleteAdminPlan = async (id) => {
 // ADMIN - PARTNER COMMISSION
 // ============================================
 
-export const updatePartnerCommission = async (partnerId, commissionPercentOverride) => {
-  const { data } = await api.put(`/admin/partners/${partnerId}/commission`, {
-    commissionPercentOverride
-  });
+export const updatePartnerCommission = async (partnerId, commissionPercentOverride, plansEnabled) => {
+  const body = {};
+  if (commissionPercentOverride !== undefined) body.commissionPercentOverride = commissionPercentOverride;
+  if (plansEnabled !== undefined) body.plansEnabled = plansEnabled;
+  
+  const { data } = await api.put(`/admin/partners/${partnerId}/commission`, body);
   return data.data;
 };
 
@@ -70,26 +72,7 @@ export const getRevenue = async (from = null, to = null) => {
 // ADMIN - PAYOUTS
 // ============================================
 
-export const generatePayouts = async (force = false) => {
-  const { data } = await api.post('/admin/payouts/generate', { force });
-  return data;
-};
-
-export const getPayouts = async (status = null, partnerId = null) => {
-  const params = new URLSearchParams();
-  if (status) params.set('status', status);
-  if (partnerId) params.set('partnerId', partnerId);
-  const { data } = await api.get(`/admin/payouts?${params.toString()}`);
-  return data.data || [];
-};
-
-export const markPayoutPaid = async (id, paymentReference, notes) => {
-  const { data } = await api.post(`/admin/payouts/${id}/mark-paid`, {
-    paymentReference,
-    notes
-  });
-  return data.data;
-};
+// Payout management moved to Partner App
 
 // ============================================
 // AUTH APIs
@@ -257,33 +240,6 @@ export const onMembershipsSnapshot = (callback, status = null) => {
 // ADMIN OPERATIONS (Batch Delete for Testing)
 // ============================================
 
-export const clearAllBookings = async () => {
-  // This would need a backend endpoint for batch delete
-  const bookings = await getBookings();
-  // For now, delete one by one (implement batch endpoint in backend later)
-  await Promise.all(bookings.map(b => api.delete(`/bookings/${b.id}`)));
-  return bookings.length;
-};
+// NOTE: Loop-delete batch operations removed for safety.
+// Only use backend-managed test data cleanup or single deletes.
 
-export const clearAllCustomers = async () => {
-  const customers = await getCustomers();
-  // Backend should handle cascade delete
-  await Promise.all(customers.map(c => api.delete(`/customers/${c.phone}`)));
-  return customers.length;
-};
-
-export const clearAllMemberships = async () => {
-  const memberships = await getMemberships();
-  await Promise.all(memberships.map(m => api.delete(`/memberships/${m.id}`)));
-  return memberships.length;
-};
-
-export const purgeAllTestData = async () => {
-  const [bCount, cCount, mCount] = await Promise.all([
-    clearAllBookings(),
-    clearAllCustomers(),
-    clearAllMemberships(),
-  ]);
-
-  return { bCount, cCount, mCount };
-};

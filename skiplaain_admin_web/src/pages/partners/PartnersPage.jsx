@@ -9,8 +9,7 @@ import {
   deletePartner,
   deleteBarber,
   clearAllBarbers,
-  updatePartnerCommission,
-  updatePartnerPlansEnabled
+  updatePartnerCommission
 } from '../../services/apiService';
 import toast from 'react-hot-toast';
 import './PartnersPage.scss';
@@ -94,7 +93,8 @@ const PartnersPage = () => {
     setSavingCommission(true);
     try {
       const payload = trimmed === '' ? null : parseFloat(trimmed);
-      await updatePartnerCommission(selectedPartner.id, payload);
+      const newPlansEnabled = selectedPartner.plansEnabled;
+      await updatePartnerCommission(selectedPartner.id, payload, newPlansEnabled);
       toast.success('Commission updated successfully!');
       setEditingCommission(false);
     } catch (err) {
@@ -109,8 +109,9 @@ const PartnersPage = () => {
     
     setTogglingPlans(true);
     try {
-      const newValue = !selectedPartner.plans_enabled;
-      await updatePartnerPlansEnabled(selectedPartner.id, newValue);
+      const newValue = !selectedPartner.plansEnabled;
+      const currentCommission = selectedPartner.commissionPercentOverride;
+      await updatePartnerCommission(selectedPartner.id, currentCommission, newValue);
       toast.success(`Subscription plans ${newValue ? 'enabled' : 'disabled'} for this salon`);
     } catch (err) {
       toast.error('Failed to toggle plans: ' + err.message);
@@ -119,15 +120,17 @@ const PartnersPage = () => {
     }
   };
 
-  const filters = ['All', 'Active', 'Blocked'];
+  const filters = ['All', 'Approved', 'Pending', 'Blocked'];
 
   const filteredPartners = partners.filter(p => {
-    const status = (p.status || 'active').toLowerCase();
+    const status = (p.status || 'pending').toLowerCase();
     const isMatchedStatus = filter === 'All' 
       ? true 
-      : filter === 'Active' 
-        ? (status === 'active' || status === 'verified' || status === 'pending') 
-        : status === filter.toLowerCase();
+      : filter === 'Approved' 
+        ? status === 'approved'
+        : filter === 'Pending'
+          ? status === 'pending'
+          : status === 'blocked';
 
     const matchesSearch = searchQuery === '' ||
       (p.salonName || p.businessName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -262,7 +265,7 @@ const PartnersPage = () => {
                       style={{ fontSize: 11, padding: '4px 10px' }}
                       onClick={() => {
                         setEditingCommission(true);
-                        setCommissionValue(selectedPartner.custom_commission_percent == null ? '' : selectedPartner.custom_commission_percent.toString());
+                        setCommissionValue(selectedPartner.commissionPercentOverride == null ? '' : selectedPartner.commissionPercentOverride.toString());
                       }}
                     >
                       Edit
@@ -299,10 +302,10 @@ const PartnersPage = () => {
                   <div style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8, padding: '10px 14px' }}>
                     <div style={{ fontSize: 13, color: '#fff' }}>
                       <strong>Commission Rate: </strong>
-                      {selectedPartner.custom_commission_percent == null ? (
+                      {selectedPartner.commissionPercentOverride == null ? (
                         <span style={{ color: '#888' }}>Using Platform Default</span>
                       ) : (
-                        <span style={{ color: '#00ff00' }}>{selectedPartner.custom_commission_percent}%</span>
+                        <span style={{ color: '#00ff00' }}>{selectedPartner.commissionPercentOverride}%</span>
                       )}
                     </div>
                   </div>
@@ -316,16 +319,16 @@ const PartnersPage = () => {
                     Subscription Plans for This Salon
                   </label>
                   <button 
-                    className={`btn btn-sm ${selectedPartner.plans_enabled ? 'btn-primary' : 'btn-ghost'}`}
+                    className={`btn btn-sm ${selectedPartner.plansEnabled ? 'btn-primary' : 'btn-ghost'}`}
                     onClick={handleTogglePlansEnabled}
                     disabled={togglingPlans}
                     style={{ fontSize: 11, padding: '4px 12px' }}
                   >
-                    {togglingPlans ? 'Updating...' : (selectedPartner.plans_enabled ? 'Enabled ✓' : 'Disabled')}
+                    {togglingPlans ? 'Updating...' : (selectedPartner.plansEnabled ? 'Enabled ✓' : 'Disabled')}
                   </button>
                 </div>
                 <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
-                  {selectedPartner.plans_enabled 
+                  {selectedPartner.plansEnabled 
                     ? 'Customers can purchase subscription plans at this salon.' 
                     : 'Subscription plans are disabled for this salon.'}
                 </div>

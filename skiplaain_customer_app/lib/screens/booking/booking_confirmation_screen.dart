@@ -116,25 +116,19 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isBooking = false);
-
-        // Handle specific error types
-        if (ApiErrorHandler.isSubscriptionRequired(e)) {
-          PopupUtils.showErrorNotification(
-            context,
-            'Active VIP subscription required. Please purchase a plan first.',
-          );
-        } else if (ApiErrorHandler.isAuthError(e)) {
-          PopupUtils.showErrorNotification(context, 'Session expired. Please login again.');
-          // Optionally navigate to login
-        } else if (ApiErrorHandler.isRateLimitError(e)) {
-          PopupUtils.showErrorNotification(context, 'Too many requests. Please try again shortly.');
-        } else if (ApiErrorHandler.isNetworkError(e)) {
-          PopupUtils.showErrorNotification(context, 'No internet connection. Please check your network and try again.');
+        
+        // Parse error and show appropriate message
+        if (e.toString().contains('402') || e.toString().contains('SUBSCRIPTION_REQUIRED')) {
+          ErrorHandler.showError(context, AppError(statusCode: 402, message: e.toString()));
+        } else if (e.toString().contains('401')) {
+          ErrorHandler.showError(context, AppError(statusCode: 401, message: 'Session expired'));
+          await ErrorHandler.handleUnauthorized(context);
+        } else if (e.toString().contains('429')) {
+          ErrorHandler.showError(context, AppError(statusCode: 429, message: e.toString()));
+        } else if (e.toString().contains('Network')) {
+          ErrorHandler.showError(context, AppError.network());
         } else {
-          PopupUtils.showErrorNotification(
-            context,
-            ApiErrorHandler.getErrorMessage(e),
-          );
+          ErrorHandler.showError(context, AppError(message: e.toString()));
         }
       }
     }

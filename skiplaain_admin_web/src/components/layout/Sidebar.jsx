@@ -1,5 +1,5 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { FiGrid, FiUsers, FiUserCheck, FiCalendar, FiSettings, FiLogOut, FiDollarSign } from 'react-icons/fi';
+import { NavLink, useLocation } from 'react-router-dom';
+import { FiGrid, FiUsers, FiUserCheck, FiCalendar, FiSettings, FiLogOut } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import './Sidebar.scss';
@@ -9,19 +9,16 @@ const navItems = [
   { path: '/partners', label: 'Partners', icon: <FiUsers /> },
   { path: '/customers', label: 'Customers', icon: <FiUserCheck /> },
   { path: '/bookings', label: 'Bookings', icon: <FiCalendar /> },
-  { path: '/payouts', label: 'Payouts', icon: <FiDollarSign /> },
   { path: '/settings', label: 'Settings', icon: <FiSettings /> },
 ];
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
-  const navigate = useNavigate();
   const { logout } = useAuth();
 
   const handleLogout = () => {
     logout();
     toast.success('Logged out');
-    navigate('/login');
   };
 
   return (

@@ -8,6 +8,7 @@ import {
   updatePartnerStatus,
   checkPhone,
 } from '../controllers/partnerController';
+import { addBarber, deleteBarber, clearAllBarbers } from '../controllers/partnerController/barberOperations';
 import { authenticate, requireRole, requireOwnerOrAdmin } from '../middleware/auth';
 import { authRateLimiter, rateLimiter } from '../middleware/rateLimiter';
 
@@ -23,5 +24,10 @@ router.get('/:id', authenticate, requireOwnerOrAdmin, rateLimiter, getPartnerByI
 router.put('/:id', authenticate, requireOwnerOrAdmin, rateLimiter, updatePartner);
 router.delete('/:id', authenticate, requireOwnerOrAdmin, rateLimiter, deletePartner);
 router.patch('/:id/status', authenticate, requireRole(['admin']), rateLimiter, updatePartnerStatus);
+
+// Barber management (admin or owner)
+router.post('/:id/barbers', authenticate, requireOwnerOrAdmin, rateLimiter, addBarber);
+router.delete('/:id/barbers/:barberId', authenticate, requireOwnerOrAdmin, rateLimiter, deleteBarber);
+router.delete('/:id/barbers', authenticate, requireRole(['admin']), rateLimiter, clearAllBarbers);
 
 export default router;

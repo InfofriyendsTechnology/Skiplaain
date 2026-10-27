@@ -1,44 +1,62 @@
 import axios from 'axios';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:61026/api',
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 seconds
+  timeout: 30000,
 });
 
-// Request interceptor - Add JWT token to all requests
+const AUTH_STORAGE_KEY = 'skiplaain_admin_session';
+let isLoggingOut = false;
+let unauthorizedHandler = null;
+
+// Allow AuthContext to register logout handler
+export const setUnauthorizedHandler = (handler) => {
+  unauthorizedHandler = handler;
+};
+
+export const resetLogoutGuard = () => {
+  isLoggingOut = false;
+};
+
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('admin_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (stored) {
+      try {
+        const { token } = JSON.parse(stored);
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      } catch {}
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor - Handle errors globally
+// Response interceptor
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    // Handle 401 Unauthorized - Clear token and redirect to login
-    if (error.response?.status === 401) {
-      localStorage.removeItem('admin_token');
-      window.location.href = '/login';
+    const status = error.response?.status;
+    const requestUrl = error.config?.url || '';
+
+    // Don't redirect on auth endpoints
+    const isAuthEndpoint = requestUrl.includes('/auth/');
+
+    if (status === 401 && !isAuthEndpoint && !isLoggingOut) {
+      isLoggingOut = true;
+      if (unauthorizedHandler) {
+        unauthorizedHandler();
+      }
+    } else if (status === 403) {
+      console.error('Permission denied:', error.response?.data?.message);
     }
 
-    // Handle other errors
-    const message = error.response?.data?.message || 'An error occurred';
-    console.error('API Error:', message);
-    
     return Promise.reject(error);
   }
 );

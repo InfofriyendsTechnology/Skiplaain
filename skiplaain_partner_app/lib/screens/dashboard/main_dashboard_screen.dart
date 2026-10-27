@@ -6,6 +6,7 @@ import '../../utils/popup_utils.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/bookings_tab.dart';
 import 'tabs/customers_tab.dart';
+import 'tabs/earnings_tab.dart';
 import 'tabs/profile_tab.dart';
 
 class MainDashboardScreen extends StatefulWidget {
@@ -59,6 +60,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
     const HomeTab(),
     const BookingsTab(),
     const CustomersTab(),
+    const EarningsTab(),
     const ProfileTab(),
   ];
 
@@ -102,6 +104,10 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.people_rounded, size: 24),
                 label: 'Customers',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.attach_money_rounded, size: 24),
+                label: 'Earnings',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person_rounded, size: 24),

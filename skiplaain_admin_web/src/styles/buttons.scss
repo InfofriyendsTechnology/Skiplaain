@@ -1,0 +1,103 @@
+// Shared button styles
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  user-select: none;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.btn-primary {
+  background: #00ff00;
+  color: #000;
+
+  &:hover:not(:disabled) {
+    background: #00dd00;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 255, 0, 0.3);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #888;
+  border: 1px solid #333;
+
+  &:hover:not(:disabled) {
+    background: #1f1f1f;
+    color: #fff;
+    border-color: #444;
+  }
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.btn-lg {
+  padding: 12px 24px;
+  font-size: 15px;
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.btn-icon {
+  padding: 8px;
+  border-radius: 6px;
+
+  svg {
+    margin: 0;
+  }
+}
+
+.btn-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

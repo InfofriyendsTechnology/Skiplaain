@@ -9,3 +9,4 @@ export { getRevenue } from './getRevenue';
 export { generatePayouts } from './generatePayouts';
 export { getPayouts } from './getPayouts';
 export { markPayoutPaid } from './markPayoutPaid';
+export { getPendingPayoutsSummary } from './getPendingPayoutsSummary';
