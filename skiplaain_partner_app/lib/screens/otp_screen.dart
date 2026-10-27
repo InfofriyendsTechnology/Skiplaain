@@ -101,8 +101,9 @@ class _OtpScreenState extends State<OtpScreen> {
         (route) => false,
       );
     } else {
-      // EXISTING USER → Save session and go to dashboard
+      // EXISTING USER → Check status and route accordingly
       final partnerId = widget.existingPartner?['id'];
+      final status = widget.existingPartner?['status']?.toString().toLowerCase() ?? 'pending';
       
       if (partnerId != null) {
         await widget.authService.savePartnerSession(
@@ -114,6 +115,22 @@ class _OtpScreenState extends State<OtpScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       
+      // Route based on status
+      if (status == 'blocked') {
+        await Future.delayed(const Duration(milliseconds: 200));
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, '/blocked', (route) => false);
+        return;
+      }
+      
+      if (status == 'pending') {
+        await Future.delayed(const Duration(milliseconds: 200));
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, '/pending', (route) => false);
+        return;
+      }
+      
+      // Status is 'approved' → go to dashboard
       final salonName = widget.existingPartner?['salonName'] ?? 'Partner';
       PopupUtils.showSuccessNotification(context, 'Welcome back, $salonName!');
       
