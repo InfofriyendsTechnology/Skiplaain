@@ -1,0 +1,13 @@
+PHASE 3 PARTNER & CUSTOMER COMPLETION REPORT
+
+Backend: DELETE /customers/:phone returns 409 Conflict for customers with ANY payment/membership/booking record. No cascade deletion. Added responseHandler.conflict() method. All 57 tests passing (10 suites, 68.3s).
+
+Partner App - Earnings: Wired to GET /api/partner/earnings (port 61026) displaying pendingPaise, includedNotPaidPaise, lifetimeEarnedPaise, paidTotalPaise, ledgerRows (earnedAt dates), payouts, nextPayoutDate. PUT /api/partner/payout-details uses snake_case (payout_upi_id, payout_bank_account_name, payout_bank_account_number, payout_bank_ifsc). Indian rupee formatting with NumberFormat en_IN locale. 6 earnings tests passing (field names, validators, snake_case contract).
+
+Partner App - Location: Added "Use Current Location" button (geolocator) + manual lat/lng TextFormFields in Salon Details screen. Saves via updatePartnerProfile(latitude, longitude) to PATCH /api/partners/:id. Android location permissions: ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION. iOS permissions: NSLocationWhenInUseUsageDescription, NSLocationAlwaysUsageDescription.
+
+Partner App - Cleanup: Removed Firebase/Firestore (0 matches), mapbox (deleted mapbox_location_picker.dart, mapbox_service.dart), added polling booking stream (30s Timer.periodic). Fixed 79 compile errors to 0. Flutter analyze: 32 issues (5 warnings, 27 info, 0 errors).
+
+Customer App: Flutter analyze 23 issues (all warnings). Endpoints verified: GET /api/salons (200), GET /api/customers/me (200). Subscription flow and booking endpoints operational.
+
+Git commits: 4 logical commits (backend 409 protection, partner earnings/location, mapbox removal/fixes, documentation). Proof scripts: partner earnings (200 OK for GET earnings, 200 for valid payout details), customer endpoints (200 for salons, customer profile).
